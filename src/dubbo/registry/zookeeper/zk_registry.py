@@ -13,6 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
+import os
 
 from dubbo.constants import common_constants, registry_constants
 from dubbo.loggers import loggerFactory
@@ -92,6 +94,9 @@ class ZookeeperRegistry(Registry):
         return self.root_dir
 
     def register(self, url: URL) -> None:
+        # zookeeper 注册的Ip可以自己控制
+        url = copy.deepcopy(url)
+        url.host = os.environ.get("ZOOKEEPER_SERVER_HOST", url.host)
         self._zk_client.create_or_update(
             self.to_url_path(url),
             url.location.encode("utf-8"),
