@@ -97,7 +97,7 @@ class ZookeeperRegistry(Registry):
         # zookeeper 注册的Ip, Port可以自己控制
         url = copy.deepcopy(url)
         url.host = os.environ.get("ZOOKEEPER_SERVER_HOST", url.host)
-        url.port = os.environ.get("ZOOKEEPER_SERVER_PORT", url.port)
+        url.port = int(os.environ.get("ZOOKEEPER_SERVER_PORT", url.port))
         self._zk_client.create_or_update(
             self.to_url_path(url),
             url.location.encode("utf-8"),

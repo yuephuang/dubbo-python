@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import functools
 import uuid
 from collections.abc import Iterable
@@ -69,7 +70,8 @@ class TripleProtocol(Protocol):
         else:
             self._path_resolver[service_handler.service_name] = service_handler
 
-        method_executor = ThreadPoolExecutor(thread_name_prefix=f"dubbo_tri_method_{str(uuid.uuid4())}", max_workers=10)
+        method_executor = ThreadPoolExecutor(thread_name_prefix=f"dubbo_tri_method_{str(uuid.uuid4())}",
+                                             max_workers=int(os.environ.get("SERVER_THREAD_POOL_SIZE", 10)))
 
         listener_factory = functools.partial(ServerTransportListener, self._path_resolver, method_executor)
 
