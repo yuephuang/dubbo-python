@@ -63,13 +63,13 @@ class ApplicationConfig(AbstractConfig):
     ]
 
     def __init__(
-        self,
-        name: str,
-        version: Optional[str] = None,
-        owner: Optional[str] = None,
-        organization: Optional[str] = None,
-        architecture: Optional[str] = None,
-        environment: Optional[str] = None,
+            self,
+            name: str,
+            version: Optional[str] = None,
+            owner: Optional[str] = None,
+            organization: Optional[str] = None,
+            architecture: Optional[str] = None,
+            environment: Optional[str] = None,
     ):
         """
         Initialize the application configuration.
@@ -243,11 +243,11 @@ class ReferenceConfig(AbstractConfig):
     __slots__ = ["_protocol", "_service", "_host", "_port"]
 
     def __init__(
-        self,
-        protocol: str,
-        service: str,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
+            self,
+            protocol: str,
+            service: str,
+            host: Optional[str] = None,
+            port: Optional[int] = None,
     ):
         """
         Initialize the reference configuration.
@@ -377,11 +377,11 @@ class ServiceConfig(AbstractConfig):
     """
 
     def __init__(
-        self,
-        service_handler: RpcServiceHandler,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        protocol: Optional[str] = None,
+            self,
+            service_handler: RpcServiceHandler,
+            host: Optional[str] = None,
+            port: Optional[int] = None,
+            protocol: Optional[str] = None,
     ):
         super().__init__()
 
@@ -491,18 +491,20 @@ class RegistryConfig(AbstractConfig):
         "_load_balance",
         "_group",
         "_version",
+        "_namespace",
     ]
 
     def __init__(
-        self,
-        protocol: str,
-        host: str,
-        port: int,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        load_balance: Optional[str] = None,
-        group: Optional[str] = None,
-        version: Optional[str] = None,
+            self,
+            protocol: str,
+            host: str,
+            port: int,
+            username: Optional[str] = None,
+            password: Optional[str] = None,
+            load_balance: Optional[str] = None,
+            group: Optional[str] = None,
+            version: Optional[str] = None,
+            namespace: Optional[str] = None,
     ):
         """
         Initialize the registry configuration.
@@ -522,6 +524,8 @@ class RegistryConfig(AbstractConfig):
         :type group: Optional[str]
         :param version: The version of the registry.
         :type version: Optional[str]
+        :param namespace: The namespace of the registry.
+        :type namespace: Optional[str]
         """
         super().__init__()
 
@@ -533,6 +537,7 @@ class RegistryConfig(AbstractConfig):
         self._load_balance = load_balance
         self._group = group
         self._version = version
+        self._namespace = namespace
 
     @property
     def protocol(self) -> str:
@@ -678,6 +683,24 @@ class RegistryConfig(AbstractConfig):
         """
         self._version = version
 
+    @property
+    def namespace(self) -> Optional[str]:
+        """
+        Get the namespace of the registry.
+        :return: The namespace of the registry.
+        :rtype: Optional[str]
+        """
+        return self._namespace
+
+    @namespace.setter
+    def namespace(self, namespace: str) -> None:
+        """
+        Set the namespace of the registry.
+        :param namespace: The namespace of the registry.
+        :type namespace: str
+        """
+        self._namespace = namespace
+
     def to_url(self) -> URL:
         """
         Convert the registry configuration to a URL.
@@ -687,6 +710,8 @@ class RegistryConfig(AbstractConfig):
         parameters = {}
         if self.load_balance:
             parameters[registry_constants.LOAD_BALANCE_KEY] = self.load_balance
+        if self.namespace:
+            parameters[registry_constants.NAMESPACE_KEY] = self.namespace
         if self.group:
             parameters[config_constants.GROUP] = self.group
         if self.version:
@@ -721,6 +746,7 @@ class RegistryConfig(AbstractConfig):
             load_balance=url.parameters.get(registry_constants.LOAD_BALANCE_KEY),
             group=url.parameters.get(config_constants.GROUP),
             version=url.parameters.get(config_constants.VERSION),
+            namespace=url.parameters.get(registry_constants.NAMESPACE_KEY),
         )
 
 
@@ -779,11 +805,11 @@ class LoggerConfig(AbstractConfig):
     ]
 
     def __init__(
-        self,
-        level: str = logger_constants.DEFAULT_LEVEL_VALUE,
-        formatter: Optional[str] = None,
-        console_enabled: bool = logger_constants.DEFAULT_CONSOLE_ENABLED_VALUE,
-        file_enabled: bool = logger_constants.DEFAULT_FILE_ENABLED_VALUE,
+            self,
+            level: str = logger_constants.DEFAULT_LEVEL_VALUE,
+            formatter: Optional[str] = None,
+            console_enabled: bool = logger_constants.DEFAULT_CONSOLE_ENABLED_VALUE,
+            file_enabled: bool = logger_constants.DEFAULT_FILE_ENABLED_VALUE,
     ):
         """
         Initialize the logger configuration.
