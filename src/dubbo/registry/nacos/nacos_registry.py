@@ -28,6 +28,7 @@ _LOGGER = loggerFactory.get_logger()
 
 DEFAULT_APPLICATION = "DEFAULT"
 
+__all__ = ["NacosRegistry", "NacosRegistryFactory"]
 
 class NacosSubscriber:
     """

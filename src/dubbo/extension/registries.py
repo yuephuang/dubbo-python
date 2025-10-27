@@ -22,7 +22,7 @@ from dubbo.compression import Compressor, Decompressor
 from dubbo.protocol import Protocol
 from dubbo.registry import RegistryFactory
 from dubbo.remoting import Transporter
-
+from dubbo.configcenter import Config
 
 @dataclass
 class ExtendedRegistry:
@@ -103,5 +103,13 @@ transporterRegistry = ExtendedRegistry(
     interface=Transporter,
     impls={
         "aio": "dubbo.remoting.aio.aio_transporter.AioTransporter",
+    },
+)
+
+# ConfigCenter registry
+configCenterRegistry = ExtendedRegistry(
+    interface=Config,
+    impls={
+        "nacos": "dubbo.config_center.nacos.nacos_config_center.NacosConfigCenter",
     },
 )
