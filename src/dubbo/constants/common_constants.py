@@ -13,56 +13,57 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+class CommonConstants:
+    """
+    Common Constants
+    """
+    DUBBO_VALUE = "dubbo"
 
-DUBBO_VALUE = "dubbo"
+    REFER_KEY = "refer"
+    EXPORT_KEY = "export"
 
-REFER_KEY = "refer"
-EXPORT_KEY = "export"
+    PROTOCOL_KEY = "protocol"
+    TRIPLE = "triple"
+    TRIPLE_SHORT = "tri"
 
-PROTOCOL_KEY = "protocol"
-TRIPLE = "triple"
-TRIPLE_SHORT = "tri"
+    SIDE_KEY = "side"
+    SERVER_VALUE = "server"
+    CLIENT_VALUE = "client"
 
-SIDE_KEY = "side"
-SERVER_VALUE = "server"
-CLIENT_VALUE = "client"
+    METHOD_KEY = "method"
+    SERVICE_KEY = "service"
 
-METHOD_KEY = "method"
-SERVICE_KEY = "service"
+    SERVICE_HANDLER_KEY = "service-handler"
 
-SERVICE_HANDLER_KEY = "service-handler"
+    GROUP_KEY = "group"
 
-GROUP_KEY = "group"
+    LOCAL_HOST_KEY = "localhost"
+    LOCAL_HOST_VALUE = "127.0.0.1"
+    DEFAULT_PORT = 50051
 
-LOCAL_HOST_KEY = "localhost"
-LOCAL_HOST_VALUE = "127.0.0.1"
-DEFAULT_PORT = 50051
+    SSL_ENABLED_KEY = "ssl-enabled"
 
-SSL_ENABLED_KEY = "ssl-enabled"
+    SERIALIZATION_KEY = "serialization"
+    SERIALIZER_KEY = "serializer"
+    DESERIALIZER_KEY = "deserializer"
 
-SERIALIZATION_KEY = "serialization"
-SERIALIZER_KEY = "serializer"
-DESERIALIZER_KEY = "deserializer"
+    COMPRESSION_KEY = "compression"
+    COMPRESSOR_KEY = "compressor"
+    DECOMPRESSOR_KEY = "decompressor"
 
+    TRANSPORTER_KEY = "transporter"
+    TRANSPORTER_DEFAULT_VALUE = "aio"
 
-COMPRESSION_KEY = "compression"
-COMPRESSOR_KEY = "compressor"
-DECOMPRESSOR_KEY = "decompressor"
+    TRUE_VALUE = "true"
+    FALSE_VALUE = "false"
 
+    RPC_TYPE_KEY = "rpc-type"
 
-TRANSPORTER_KEY = "transporter"
-TRANSPORTER_DEFAULT_VALUE = "aio"
+    METHOD_DESCRIPTOR_KEY = "method-descriptor"
 
-TRUE_VALUE = "true"
-FALSE_VALUE = "false"
+    LOADBALANCE_KEY = "loadbalance"
 
-RPC_TYPE_KEY = "rpc-type"
-
-METHOD_DESCRIPTOR_KEY = "method-descriptor"
-
-LOADBALANCE_KEY = "loadbalance"
-
-PATH_SEPARATOR = "/"
-PROTOCOL_SEPARATOR = "://"
-ANY_VALUE = "*"
-COMMA_SEPARATOR = ","
+    PATH_SEPARATOR = "/"
+    PROTOCOL_SEPARATOR = "://"
+    ANY_VALUE = "*"
+    COMMA_SEPARATOR = ","

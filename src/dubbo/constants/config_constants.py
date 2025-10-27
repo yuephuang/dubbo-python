@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ENVIRONMENT = "environment"
-TEST_ENVIRONMENT = "test"
-DEVELOPMENT_ENVIRONMENT = "develop"
-PRODUCTION_ENVIRONMENT = "product"
+class ConfigConstants:
+    ENVIRONMENT = "environment"
+    TEST_ENVIRONMENT = "test"
+    DEVELOPMENT_ENVIRONMENT = "develop"
+    PRODUCTION_ENVIRONMENT = "product"
 
-VERSION = "version"
-GROUP = "group"
+    VERSION = "version"
+    GROUP = "group"
 
-TRANSPORT = "transport"
-AIO_TRANSPORT = "aio"
+    TRANSPORT = "transport"
+    AIO_TRANSPORT = "aio"

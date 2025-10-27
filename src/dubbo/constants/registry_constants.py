@@ -14,12 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY_KEY = "registry"
-DYNAMIC_KEY = "dynamic"
-CATEGORY_KEY = "category"
-PROVIDERS_CATEGORY = "providers"
-CONSUMERS_CATEGORY = "consumers"
+class RegistryConstants(object):
+    """
+    The registry constants.
+    """
 
+    # registry type
+    REGISTRY_KEY = "registry"
+    DYNAMIC_KEY = "dynamic"
+    CATEGORY_KEY = "category"
+    PROVIDERS_CATEGORY = "providers"
+    CONSUMERS_CATEGORY = "consumers"
 
-LOAD_BALANCE_KEY = "loadbalance"
-NAMESPACE_KEY = "namespace"
+    LOAD_BALANCE_KEY = "loadbalance"
+    NAMESPACE_KEY = "namespace"
