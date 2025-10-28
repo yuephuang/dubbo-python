@@ -13,14 +13,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import random
+
 import dubbo
 from dubbo.configs import RegistryConfig, ServiceConfig
 from dubbo.proxy.handlers import RpcMethodHandler, RpcServiceHandler
 from samples.proto import greeter_pb2
 
-
+ra = random.randint(0, 1) == 1
+print(ra)
 class GreeterServiceServicer:
     def say_hello(self, request):
+        if not ra:
+            raise Exception("Error")
         print(f"Received request: {request.name}")
         return greeter_pb2.GreeterReply(message=f"Hello, {request.name}!")
 
@@ -48,7 +53,8 @@ if __name__ == "__main__":
     # build a service config
     service_handler = build_server_handler()
     service_config = ServiceConfig(service_handler)
-    service_config.port = 50001
+    service_config.port = random.randint(50000, 51000)
+
     # start the server
     server = bootstrap.create_server(service_config).start()
 

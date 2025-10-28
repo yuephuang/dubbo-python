@@ -98,7 +98,7 @@ def _init_nacos_client(url: URL) -> NacosClient:
 
 def _build_nacos_service_name(url: URL):
     service_name = url.parameters.get(common_constants.SERVICE_KEY)
-    return f"providers:{service_name}::"
+    return f"{registry_constants.PROVIDERS_CATEGORY}:{service_name}"
 
 
 class NacosRegistry(Registry):
@@ -129,7 +129,7 @@ class NacosRegistry(Registry):
             "release": f"{dubbo.__version__}_py",
             "protocol": "tri",
             "application": DEFAULT_APPLICATION,
-            "category": "providers",
+            "category": registry_constants.PROVIDERS_CATEGORY,
             "enabled": "true",
             "disabled": "false",
         }

@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
 
 import dubbo
 from dubbo.configs import ReferenceConfig, RegistryConfig
@@ -40,7 +41,8 @@ if __name__ == "__main__":
     dubbo_client = bootstrap.create_client(reference_config)
 
     stub = GreeterServiceStub(dubbo_client)
+    while True:
+        result = stub.say_hello(greeter_pb2.GreeterRequest(name="dubbo-python"))
 
-    result = stub.say_hello(greeter_pb2.GreeterRequest(name="dubbo-python"))
-
-    print(result.message)
+        print(result.message)
+        time.sleep(1)

@@ -23,6 +23,7 @@ from kazoo.protocol.states import EventType, KazooState, WatchedEvent, ZnodeStat
 
 from dubbo.loggers import loggerFactory
 from dubbo.url import URL
+
 from ._interfaces import (
     ChildrenListener,
     DataListener,
@@ -372,14 +373,14 @@ class KazooZookeeperClient(ZookeeperClient):
             if listener in self._state_listeners:
                 return
             state_adapter = StateListenerAdapter(listener)
-            self._client.subscribe(state_adapter)
+            self._client.add_listener(state_adapter)
             self._state_listeners[listener] = state_adapter
 
     def remove_state_listener(self, listener: StateListener) -> None:
         with self._state_lock:
             state_adapter = self._state_listeners.pop(listener, None)
             if state_adapter is not None:
-                self._client.unsubscribe(state_adapter)
+                self._client.remove_listener(state_adapter)
 
     def add_data_listener(self, path: str, listener: DataListener) -> None:
         self._data_adapter_factory.create(path, listener)
