@@ -34,7 +34,7 @@ class GreeterServiceStub:
 
 if __name__ == "__main__":
     registry_config = RegistryConfig.from_url("nacos://nacos:123456@127.0.0.1:8848?namespace=public")
-    registry_config.load_balance = "hash"
+    # registry_config.load_balance = "hash"
     bootstrap = dubbo.Dubbo(registry_config=registry_config)
 
     reference_config = ReferenceConfig(protocol="tri", service="org.apache.dubbo.samples.data.Greeter")
