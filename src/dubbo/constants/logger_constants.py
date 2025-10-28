@@ -18,49 +18,66 @@ import enum
 import os
 
 __all__ = [
-    "LoggerConstants"
+    "FileRotateType",
+    "LEVEL_KEY",
+    "CONSOLE_ENABLED_KEY",
+    "FILE_ENABLED_KEY",
+    "FILE_DIR_KEY",
+    "FILE_NAME_KEY",
+    "FILE_ROTATE_KEY",
+    "FILE_MAX_BYTES_KEY",
+    "FILE_INTERVAL_KEY",
+    "FILE_BACKUP_COUNT_KEY",
+    "DEFAULT_LEVEL_VALUE",
+    "DEFAULT_CONSOLE_ENABLED_VALUE",
+    "DEFAULT_FILE_ENABLED_VALUE",
+    "DEFAULT_FILE_DIR_VALUE",
+    "DEFAULT_FILE_NAME_VALUE",
+    "DEFAULT_FILE_MAX_BYTES_VALUE",
+    "DEFAULT_FILE_INTERVAL_VALUE",
+    "DEFAULT_FILE_BACKUP_COUNT_VALUE",
 ]
 
 
-class LoggerConstants:
-    @enum.unique
-    class FileRotateType(enum.Enum):
-        """
-        The file rotating type enum.
+@enum.unique
+class FileRotateType(enum.Enum):
+    """
+    The file rotating type enum.
 
-        :cvar NONE: No rotating.
-        :cvar SIZE: Rotate the file by size.
-        :cvar TIME: Rotate the file by time.
-        """
+    :cvar NONE: No rotating.
+    :cvar SIZE: Rotate the file by size.
+    :cvar TIME: Rotate the file by time.
+    """
 
-        NONE = "NONE"
-        SIZE = "SIZE"
-        TIME = "TIME"
+    NONE = "NONE"
+    SIZE = "SIZE"
+    TIME = "TIME"
 
-    """logger config keys"""
-    # global config
-    LEVEL_KEY = "logger.level"
 
-    # console config
-    CONSOLE_ENABLED_KEY = "logger.console.enable"
+"""logger config keys"""
+# global config
+LEVEL_KEY = "logger.level"
 
-    # file logger
-    FILE_ENABLED_KEY = "logger.file.enable"
-    FILE_DIR_KEY = "logger.file.dir"
-    FILE_NAME_KEY = "logger.file.name"
-    FILE_ROTATE_KEY = "logger.file.rotate"
-    FILE_MAX_BYTES_KEY = "logger.file.maxbytes"
-    FILE_INTERVAL_KEY = "logger.file.interval"
-    FILE_BACKUP_COUNT_KEY = "logger.file.backupcount"
+# console config
+CONSOLE_ENABLED_KEY = "logger.console.enable"
 
-    """some logger default value"""
-    DEFAULT_LEVEL_VALUE = "INFO"
-    # console
-    DEFAULT_CONSOLE_ENABLED_VALUE = True
-    # file
-    DEFAULT_FILE_ENABLED_VALUE = False
-    DEFAULT_FILE_DIR_VALUE = os.path.expanduser("~")
-    DEFAULT_FILE_NAME_VALUE = "dubbo.log"
-    DEFAULT_FILE_MAX_BYTES_VALUE = 10 * 1024 * 1024
-    DEFAULT_FILE_INTERVAL_VALUE = 1
-    DEFAULT_FILE_BACKUP_COUNT_VALUE = 10
+# file logger
+FILE_ENABLED_KEY = "logger.file.enable"
+FILE_DIR_KEY = "logger.file.dir"
+FILE_NAME_KEY = "logger.file.name"
+FILE_ROTATE_KEY = "logger.file.rotate"
+FILE_MAX_BYTES_KEY = "logger.file.maxbytes"
+FILE_INTERVAL_KEY = "logger.file.interval"
+FILE_BACKUP_COUNT_KEY = "logger.file.backupcount"
+
+"""some logger default value"""
+DEFAULT_LEVEL_VALUE = "INFO"
+# console
+DEFAULT_CONSOLE_ENABLED_VALUE = True
+# file
+DEFAULT_FILE_ENABLED_VALUE = False
+DEFAULT_FILE_DIR_VALUE = os.path.expanduser("~")
+DEFAULT_FILE_NAME_VALUE = "dubbo.log"
+DEFAULT_FILE_MAX_BYTES_VALUE = 10 * 1024 * 1024
+DEFAULT_FILE_INTERVAL_VALUE = 1
+DEFAULT_FILE_BACKUP_COUNT_VALUE = 10
