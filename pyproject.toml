@@ -19,7 +19,7 @@ requires = ["hatchling", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
 
 [project]
-name="apache-dubbo"
+name="lawgenesis-dubbo"
 requires-python = ">=3.9"
 authors = [
     {name = "Apache Dubbo Community", email = "dev@dubbo.apache.org"}
@@ -175,3 +175,7 @@ testpaths = ["tests"]
 python_files = [
     "test_*.py"
 ]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
