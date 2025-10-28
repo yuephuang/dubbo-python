@@ -23,7 +23,6 @@ from kazoo.protocol.states import EventType, KazooState, WatchedEvent, ZnodeStat
 
 from dubbo.loggers import loggerFactory
 from dubbo.url import URL
-
 from ._interfaces import (
     ChildrenListener,
     DataListener,

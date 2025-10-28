@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .__about__ import __version__
 from .bootstrap import Dubbo
 from .client import Client
 from .server import Server
-from .__about__ import __version__
 
 __all__ = ["Dubbo", "Client", "Server", "__version__"]

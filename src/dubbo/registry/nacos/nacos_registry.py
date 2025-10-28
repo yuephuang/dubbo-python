@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import dubbo
-
 from nacos import NacosClient
 from nacos.timer import NacosTimer, NacosTimerManager
 
+import dubbo
 from dubbo.constants import common_constants, registry_constants
+from dubbo.loggers import loggerFactory
 from dubbo.registry import NotifyListener, Registry, RegistryFactory
 from dubbo.url import URL
-from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 

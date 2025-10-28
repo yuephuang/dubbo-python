@@ -19,10 +19,11 @@ from typing import Any
 
 from dubbo.cluster import LoadBalance
 from dubbo.compression import Compressor, Decompressor
+from dubbo.configcenter import Config
 from dubbo.protocol import Protocol
 from dubbo.registry import RegistryFactory
 from dubbo.remoting import Transporter
-from dubbo.configcenter import Config
+
 
 @dataclass
 class ExtendedRegistry:
