@@ -20,7 +20,7 @@ from v2.nacos import NacosConfigService, ClientConfigBuilder, GRPCConfig, Config
 
 from dubbo.configcenter._interfaces import Config
 from dubbo.constants import registry_constants
-from dubbo.url import URL
+from dubbo.url import URL, create_url
 
 __all__ = ["NacosConfigCenter"]
 
@@ -29,7 +29,9 @@ class NacosConfigCenter(Config):
     Nacos 配置中心实现，使用 v2.nacos.NacosConfigService
     """
 
-    def __init__(self, url: URL):
+    def __init__(self, url: URL | str):
+        if isinstance(url, str):
+            url = create_url(url)
         self.url = url
         # nacos_client 实际上是 NacosConfigService 实例
         self.nacos_client = None
