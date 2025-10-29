@@ -20,6 +20,7 @@ from typing import Any
 from dubbo.cluster import LoadBalance
 from dubbo.compression import Compressor, Decompressor
 from dubbo.configcenter import Config
+from dubbo.notify import NoticeFactory
 from dubbo.protocol import Protocol
 from dubbo.registry import RegistryFactory
 from dubbo.remoting import Transporter
@@ -48,6 +49,8 @@ registries = [
     "compressorRegistry",
     "decompressorRegistry",
     "transporterRegistry",
+    "configCenterRegistry",
+    "notifyFactoryRegistry"
 ]
 
 # RegistryFactory registry
@@ -112,5 +115,12 @@ configCenterRegistry = ExtendedRegistry(
     interface=Config,
     impls={
         "nacos": "dubbo.config_center.nacos.nacos_config_center.NacosConfigCenter",
+    },
+)
+
+notifyFactoryRegistry = ExtendedRegistry(
+    interface=NoticeFactory,
+    impls={
+        "feishu": "dubbo.notify.FeiShuNotify",
     },
 )

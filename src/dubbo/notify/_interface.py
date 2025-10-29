@@ -15,6 +15,7 @@
 # limitations under the License.
 import abc
 import threading
+import uuid
 from abc import ABC
 from typing import Dict, List
 
@@ -23,6 +24,34 @@ from aiohttp import ClientSession
 from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
+
+class ServerNotifyData(object):
+    """
+    服务状态数据
+    """
+    def __init__(self, server_name, host, port, intranet_ip, internet_ip, status, start_time):
+        self.server_name = server_name
+        self.host = host
+        self.port = str(port)
+        self.intranet_ip = intranet_ip
+        self.internet_ip = internet_ip
+        self.status = status
+        self.start_time = start_time
+        self.uuid = uuid.uuid4().hex
+
+    @property
+    def json(self):
+        return {
+            "server_name": self.server_name,
+            "host": self.host,
+            "port": self.port,
+            "intranet_ip": self.intranet_ip,
+            "internet_ip": self.internet_ip,
+            "status": self.status,
+            "start_time": self.start_time,
+            "uuid": self.uuid
+        }
+
 
 class NoticeFactory(ABC):
     """
@@ -129,7 +158,8 @@ class NoticeFactory(ABC):
                                         ssl=False,
                                         ) as response:
                     response.raise_for_status()
-                    return await response.json()
+                    data = await response.json()
+            return data
         except Exception as e:
             _LOGGER.error(f"Send data to {self.url} failed: {e}")
             # 通知不报错
@@ -149,3 +179,11 @@ class NoticeFactory(ABC):
         """
 
 
+    async def send_table(self, title="", subtitle="", elements: List[ServerNotifyData] =None):
+        """
+        Send data to the notice.
+        :param title: The title of the notice.
+        :param subtitle: The subtitle of the notice.
+        :param elements: The elements of the notice.
+        :return: The response.
+        """
