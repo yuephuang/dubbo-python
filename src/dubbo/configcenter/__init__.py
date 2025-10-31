@@ -16,7 +16,8 @@
 
 from ._interfaces import Config
 from .nacos import NacosConfigCenter
+from .local import LocalConfigCenter
 
 __all__ = [
-    "NacosConfigCenter"
+    "NacosConfigCenter", "LocalConfigCenter"
 ]

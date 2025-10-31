@@ -25,17 +25,17 @@ from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 
-class ServerNotifyData(object):
+class ServerMetaData(object):
     """
     服务状态数据
     """
-    def __init__(self, server_name, host, port, intranet_ip, internet_ip, status, start_time):
+    def __init__(self, server_name, host, host_name, intranet_ip, internet_ip, message, start_time):
         self.server_name = server_name
         self.host = host
-        self.port = str(port)
+        self.host_name = host_name
         self.intranet_ip = intranet_ip
         self.internet_ip = internet_ip
-        self.status = status
+        self.message = message
         self.start_time = start_time
         self.uuid = uuid.uuid4().hex
 
@@ -44,10 +44,10 @@ class ServerNotifyData(object):
         return {
             "server_name": self.server_name,
             "host": self.host,
-            "port": self.port,
+            "host_name": self.host_name,
             "intranet_ip": self.intranet_ip,
             "internet_ip": self.internet_ip,
-            "status": self.status,
+            "message": self.message,
             "start_time": self.start_time,
             "uuid": self.uuid
         }
@@ -179,7 +179,7 @@ class NoticeFactory(ABC):
         """
 
 
-    async def send_table(self, title="", subtitle="", elements: List[ServerNotifyData] =None):
+    async def send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
         """
         Send data to the notice.
         :param title: The title of the notice.

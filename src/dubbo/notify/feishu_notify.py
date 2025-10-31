@@ -16,7 +16,7 @@
 import time
 from typing import List, Dict, Any
 
-from dubbo.notify._interface import NoticeFactory, ServerNotifyData
+from dubbo.notify._interface import NoticeFactory, ServerMetaData
 
 
 class FeiShuNotify(NoticeFactory):
@@ -85,7 +85,7 @@ class FeiShuNotify(NoticeFactory):
       }
         return await self.async_send_data(data)
 
-    async def send_table(self, title="", subtitle="", elements: List[ServerNotifyData] =None):
+    async def send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
         """
         将json 数据变成表格发布
         """
@@ -145,8 +145,8 @@ class FeiShuNotify(NoticeFactory):
                             "width": "auto"
                         },
                         {
-                            "name": "port",
-                            "display_name": "端口",
+                            "name": "host_name",
+                            "display_name": "主机名",
                             "data_type": "text",
                             "horizontal_align": "left",
                             "vertical_align": "top",
@@ -169,8 +169,8 @@ class FeiShuNotify(NoticeFactory):
                             "width": "auto"
                         },
                         {
-                            "name": "status",
-                            "display_name": "状态",
+                            "name": "message",
+                            "display_name": "消息",
                             "data_type": "text",
                             "horizontal_align": "left",
                             "vertical_align": "top",

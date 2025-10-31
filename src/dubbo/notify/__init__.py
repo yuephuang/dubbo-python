@@ -17,7 +17,7 @@
 """
 通知组件
 """
-from ._interface import NoticeFactory, ServerNotifyData
+from ._interface import NoticeFactory, ServerMetaData
 from .feishu_notify import FeiShuNotify
 
-__all__ = ["FeiShuNotify", "NoticeFactory", "ServerNotifyData"]
+__all__ = ["FeiShuNotify", "NoticeFactory", "ServerMetaData"]

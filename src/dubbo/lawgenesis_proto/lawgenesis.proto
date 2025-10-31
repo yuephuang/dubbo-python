@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package org.apache.dubbo.sample.tri;
+
+service Lawgenesis {
+  rpc LawgenesisSdk(LawgenesisRequest) returns (LawgenesisReply);
+}
+
+message Auth {
+    string AUTY = 1; // 鉴权类型
+    string ACID = 2; // 鉴权ID
+    string ACKY = 3; // 鉴权key，非JWT
+}
+
+message BaseData {
+  string VER = 1; // 协议版本号
+  string TRID = 2; // 整个流程的唯一ID
+  int64 TRST = 3; // 数据最早生成的时间，业务Data的postTime, ms
+  int64 EXPT = 4; // 预期的超时时间，时区保证一致, ms
+  Auth AUTH = 5;
+  map<string, string> ECHO = 6; // 回带字段，用以原封不动的回带任何信息
+  string CBUR = 7; // callback 链接
+  int32 SLA = 8; // SLA服务级别，用以标识服务优先级
+  bool RETRY = 9; // 是否重试
+  bool CACHE = 10; // 是否缓存
+  string DTYP = 11; // 数据类型
+  bytes DATA = 12;
+  map<string, string> EXIF = 13; // 额外字段
+}
+
+message LawgenesisRequest {
+  BaseData BADA = 1;
+  bytes DATA = 2; // 请求数据
+}
+
+message LawgenesisReply {
+  BaseData BADA = 1;
+  bytes Response = 2; // 响应数据
+}
