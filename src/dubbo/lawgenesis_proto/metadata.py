@@ -145,3 +145,10 @@ class LawMetaData:
     def auth(self) -> LawAuthInfo:
         """Returns the authentication information (AUTH)."""
         return self._baseData.AUTH
+
+    @auth.setter
+    def auth(self, value: lawgenesis_pb2.Auth) -> None:
+        """Sets the authentication information (AUTH)."""
+        self._baseData.AUTH.ACID = value.ACID
+        self._baseData.AUTH.ACKY = value.ACKY
+        self._baseData.AUTH.AUTY = value.AUTY

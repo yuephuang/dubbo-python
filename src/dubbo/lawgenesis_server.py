@@ -32,10 +32,11 @@ from dubbo.lawgenesis_proto import (
 )
 from dubbo.lawgenesis_proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
+from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.loggers import loggerFactory
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
-from dubbo.proxy.handlers import RpcServiceHandler, RpcMethodHandler
+from dubbo.proxy.handlers import RpcServiceHandler
 
 _LOGGER = loggerFactory.get_logger()
 cache_map: dict[str, CacheClient] = {}
@@ -47,17 +48,6 @@ protobuf_type_map = {
     "llm": LLMProtobuf,
     "base": ProtobufInterface,
 }
-
-
-def rpc_server(method_name, func):
-    return RpcMethodHandler.unary(
-        method=func,  # 实际处理请求的方法
-        method_name=method_name,  # 方法名称
-        request_deserializer=lawgenesis_pb2.LawgenesisRequest.FromString,
-        response_serializer=lawgenesis_pb2.LawgenesisReply.SerializeToString,
-    )
-
-
 
 class LawgenesisService:
     """
@@ -147,11 +137,9 @@ class LawgenesisService:
         创建并返回一个 Dubbo 服务器实例。
         它根据是否提供了注册中心 URL 来配置服务器。
         """
-        service_config = ServiceConfig(
-            service_handler=self.service_handler(), host=self.law_server_config.host, port=self.law_server_config.port
-        )
         if self.law_server_config.register_center_url:
             # 如果提供了注册中心，则使用 Dubbo 引导程序进行注册
+            service_config = ServiceConfig(service_handler=self.service_handler())
             registry_config = RegistryConfig.from_url(self.law_server_config.register_center_url)
             registry_config.group = self.law_server_config._group
             registry_config.version = self.law_server_config.version
@@ -159,6 +147,10 @@ class LawgenesisService:
             return bootstrap.create_server(service_config)
         else:
             # 否则，创建一个独立的 Dubbo 服务器
+            service_config = ServiceConfig(
+                service_handler=self.service_handler(), host=self.law_server_config.host,
+                port=self.law_server_config.port
+            )
             return Server(service_config)
 
     def service_handler(self) -> RpcServiceHandler:
@@ -184,23 +176,23 @@ class LawgenesisService:
                 protobuf_interface = protobuf_type_map.get(protobuf_type)
                 law_basedata = LawMetaData(request.BADA)
                 request_data = orjson.loads(request.DATA)
+                serialize_func = protobuf_interface(request_data)
                 _LOGGER.info(f"{method_name} start, start_time: {st}, trace_id: {law_basedata.trace_id}")
                 if law_basedata.data_type != protobuf_type:
                     err_msg = f"{method_name} data_type error, expect: {protobuf_type}, actual: {law_basedata.data_type}"
                     _LOGGER.error(err_msg)
-                    response_data = ResponseProto(data={"message": err_msg}, context_id=protobuf_interface.context_id,
+                    response_data = ResponseProto(data={"message": err_msg}, context_id=serialize_func.context_id,
                                                   code=GRpcCode.INVALID_ARGUMENT.value).to_bytes()
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
-                        DATA=response_data,
+                        Response=response_data,
                     )
-                serialize_func = protobuf_interface(request_data)
                 # todo 鉴权
                 if not self.check_auth(law_basedata.auth):
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
                         DATA=ResponseProto(data="auth error",
-                                           context_id=protobuf_interface.context_id,
+                                           context_id=serialize_func.context_id,
                                            code=GRpcCode.UNAUTHENTICATED.value).to_bytes(),
                     )
                 # todo 流控
@@ -212,7 +204,7 @@ class LawgenesisService:
                     _LOGGER.info(f"{method_name} cache hit, key: {serialize_func.cache_key}")
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
-                        DATA=response_data,
+                        Response=response_data,
                     )
 
                 try:
@@ -220,26 +212,26 @@ class LawgenesisService:
                     if not isinstance(response, dict):
                         _LOGGER.error(f"{method_name} response_data must be a dict")
                         response_data = ResponseProto(data="response_data must be a dict",
-                                                       context_id=protobuf_interface.context_id,
+                                                       context_id=serialize_func.context_id,
                                                        code=GRpcCode.INTERNAL.value).to_bytes()
                         return lawgenesis_pb2.LawgenesisReply(
                             BADA=law_basedata.basedata,
-                            DATA=response_data,
+                            Response=response_data,
                         )
-                    response_data = ResponseProto(data=response, context_id=protobuf_interface.context_id,
+                    response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
                                                   code=GRpcCode.OK.value).to_bytes()
                     self.set_cache(method_name=method_name, key=serialize_func.cache_key, value=response_data)
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
-                        DATA=response_data,
+                        Response=response_data,
                     )
                 except Exception as e:
-                    response_data = ResponseProto(data=str(e), context_id=protobuf_interface.context_id,
+                    response_data = ResponseProto(data=str(e), context_id=serialize_func.context_id,
                                                   code=GRpcCode.UNAVAILABLE.value).to_bytes()
                     _LOGGER.error(f"{method_name} error: {e}")
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
-                        DATA=response_data,
+                        Response=response_data,
                     )
                 finally:
                     et = time.perf_counter()
@@ -265,8 +257,9 @@ class LawgenesisService:
         return cache_client.set(key, value)
 
     @staticmethod
-    def check_auth(auth_info: LawAuthInfo) -> bool:
-        if auth_info.auth_key != "lawgenesis":
+    def check_auth(auth_info: lawgenesis_pb2.Auth) -> bool:
+        info = LawAuthInfo(auth_info)
+        if info.auth_key != "lawgenesis":
             return False
         return True
 
@@ -293,10 +286,11 @@ class LawgenesisService:
 
     def start(self):
         """启动服务：在后台启动异步任务，然后启动主同步服务"""
-
         # 1. 创建并启动线程来运行异步循环
         async_thread = threading.Thread(target=self._start_loop, daemon=True)
         async_thread.start()
+        # 跑太快了，导致配置没获取到
+        time.sleep(1)
         self.server.start()
         while True:
             time.sleep(1)

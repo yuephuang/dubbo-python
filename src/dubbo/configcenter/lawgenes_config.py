@@ -187,10 +187,11 @@ class LawClientConfig(ConfigReloader):
         super().__init__()
         self.name = None
         self.version = None
-        self.server_group = None
+        self.client_group = None
         self.env = None
         self.load_balance = None
         self.server_url = None
+        self.register_center_url = None
         self.config_name = "client"
 
 
