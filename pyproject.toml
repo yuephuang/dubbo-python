@@ -61,6 +61,8 @@ dependencies = [
     "orjson>=3.11.4",
     "cachetools>=6.2.1",
     "pympler>=1.1",
+    "throttled-py[all]>=2.2.3",
+    "blinker>=1.9.0",
 ]
 dynamic = ["version", "readme"]
 

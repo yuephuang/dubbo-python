@@ -1043,16 +1043,3 @@ class LoggerConfig(AbstractConfig):
         :type file_config: FileConfig
         """
         self._file_config = file_config
-
-class NotifyConfig:
-    """
-    The notify configuration.
-    """
-    def __init__(self, url: str="", notify_type="feishu"):
-        """
-        Initialize the notify configuration.
-        :param url: The notify url.
-        :type notify_type: str
-        """
-        self.url = url or os.environ.get("notify_url")
-        self.notify_type = notify_type

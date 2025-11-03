@@ -1,15 +1,11 @@
-import abc
 import ast
-import asyncio
 import os
-import time
 from typing import Union, Dict, Any
 
-import cachetools
-
-from dubbo.loggers import loggerFactory
+from blinker import signal
 
 from dubbo.configcenter import NacosConfigCenter, LocalConfigCenter, Config
+from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 
@@ -74,6 +70,10 @@ class ConfigReloader:
                 cls._client_instance = NacosConfigCenter(url=os.environ.get("CONFIG_URL"))
         return cls._client_instance
 
+    @staticmethod
+    def single_send():
+        _LOGGER.info("Send single config")
+
     async def reload(self, tenant, data_id, group, content):
         """
         异步重载配置。
@@ -93,7 +93,7 @@ class ConfigReloader:
                 return
 
             _LOGGER.info(f"Reload config: {data_json}, success")
-
+            self.single_send()
         except Exception as e:
             _LOGGER.error(f"Reload config: {content}, failed: {e}")
             return
@@ -177,6 +177,10 @@ class LawServerConfig(ConfigReloader):
         self.register_center_url = None
         self.config_name = "server"
 
+    @staticmethod
+    def single_send():
+        return server_single.send()
+
 class LawClientConfig(ConfigReloader):
     """
     客户端配置类
@@ -193,7 +197,9 @@ class LawClientConfig(ConfigReloader):
         self.server_url = None
         self.register_center_url = None
         self.config_name = "client"
-
+    @staticmethod
+    def single_send():
+        return client_single.send()
 
 class MethodCacheConfig:
     """
@@ -261,8 +267,7 @@ class MethodRateLimitConfig:
     VALID_STORAGES = {"memory", "redis"}
 
     def __init__(self, limits_enable: bool, limits_storge: str, limits_storge_url: str,
-                 limits_strategies: str, limits_storge_amount: int, limits_storge_multiples: int,
-                 limits_storge_options: Union[str, Dict[str, Any]]
+                 limits_storge_options: Union[str, Dict[str, Any]], limits_keys_operation: Dict[str, Any]
                  ):
         """
         初始化一个 RateLimitConfig 实例。
@@ -271,10 +276,8 @@ class MethodRateLimitConfig:
             limits_enable (bool): 是否启用速率限制。
             limits_storge (str): 限流存储方式，可选 "memory" (内存) 或 "redis"。
             limits_storge_url (str): 限流存储地址 (如 "127.0.0.1:6379")，仅当 limits_storge="redis" 时有效。
-            limits_strategies (str): 限流策略，可选 "fixed_window", "sliding_window" 等。
-            limits_storge_amount (int): 限制的配额/请求数。例如，每分钟允许 100 次请求，此值为 100。
-            limits_storge_multiples (int): 时间窗口长度（秒）。例如，每 60 秒 (1 分钟) 的流量，此值为 60。
             limits_storge_options (str | dict): 存储相关的额外配置，如果是字符串则使用 ast.literal_eval 安全解析为字典。
+            limits_keys_operation (str | dict): 每个key的特定配置。
         """
         self.limits_enable = limits_enable
 
@@ -284,27 +287,8 @@ class MethodRateLimitConfig:
         self.limits_storge = limits_storge
 
         self.limits_storge_url = limits_storge_url
-
-        # 校验并设置限流策略
-        if limits_strategies not in self.VALID_STRATEGIES:
-            raise ValueError(
-                f"Invalid limits_strategies: '{limits_strategies}'. Must be one of {self.VALID_STRATEGIES}")
-        self.limits_strategies = limits_strategies
-
-        self.limits_storge_amount = limits_storge_amount
-        self.limits_storge_multiples = limits_storge_multiples
-
-        # 解析 limits_storge_options
-        self.limits_storge_options = {}
-        if isinstance(limits_storge_options, str):
-            try:
-                self.limits_storge_options = ast.literal_eval(limits_storge_options)
-                if not isinstance(self.limits_storge_options, dict):
-                    raise TypeError("Parsed limits_storge_options must be a dictionary.")
-            except (ValueError, SyntaxError, TypeError) as e:
-                raise ValueError(f"Error evaluating limits_storge_options string: {e}")
-        elif isinstance(limits_storge_options, dict):
-            self.limits_storge_options = limits_storge_options
+        self.limits_storge_options = ast.literal_eval(limits_storge_options)
+        self.limits_keys_operation = limits_keys_operation
 
     def hash_code(self):
         """
@@ -314,8 +298,7 @@ class MethodRateLimitConfig:
             int: The hash value of the rate limit configuration.
         """
         return hash((self.limits_enable, self.limits_storge, self.limits_storge_url,
-                     self.limits_strategies, self.limits_storge_amount, self.limits_storge_multiples,
-                     self.limits_storge_options))
+                     self.limits_storge_options, self.limits_keys_operation))
 
 class LawMethodConfig(ConfigReloader):
     """
@@ -328,6 +311,10 @@ class LawMethodConfig(ConfigReloader):
         self.method_name_map = {}
         self.config_name = "method"
         self.protobuf_type = "txt"
+
+    @staticmethod
+    def single_send():
+        return method_single.send()
 
     def cache(self, method_name) -> MethodCacheConfig:
         cache_item = self._cache_config.get(method_name, {}).get("cache", {})
@@ -353,9 +340,28 @@ class LawMethodConfig(ConfigReloader):
             limits_enable=limits_item.get("limits_enable", False),
             limits_storge=limits_item.get("limits_storge", "memory"),
             limits_storge_url = limits_item.get("limits_storge_url",  "127.0.0.1:6379"),
-            limits_strategies = limits_item.get("limits_strategies", "fixed_window"),
-            limits_storge_amount = limits_item.get("limits_storge_amount", 1),
-            limits_storge_multiples = limits_item.get("limits_storge_multiples", 60),
-            limits_storge_options = limits_item.get("limits_storge_options", {})
+            limits_storge_options = limits_item.get("limits_storge_options", {}),
+            limits_keys_operation = limits_item.get("limits_keys_operation", {})
         )
+
+class NotifyConfig:
+    """
+    The notify configuration.
+    """
+    def __init__(self, url: str="", notify_type="feishu"):
+        """
+        Initialize the notify configuration.
+        :param url: The notify url.
+        :type notify_type: str
+        """
+        self.url = url or os.environ.get("notify_url")
+        self.notify_type = notify_type
+
+# todo， 后续用single 来通知配置变化
+
+server_single = signal("server")
+client_single = signal("client")
+method_single = signal("method")
+
+
 

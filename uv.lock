@@ -340,6 +340,15 @@ wheels = [
 ]
 
 [[package]]
+name = "blinker"
+version = "1.9.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/21/28/9b3f50ce0e048515135495f198351908d99540d69bfdc8c1d15b73dc55ce/blinker-1.9.0.tar.gz", hash = "sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl", hash = "sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc" },
+]
+
+[[package]]
 name = "cachetools"
 version = "6.2.1"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -882,6 +891,7 @@ wheels = [
 name = "lawgenesis-dubbo"
 source = { editable = "." }
 dependencies = [
+    { name = "blinker" },
     { name = "cachetools" },
     { name = "h2" },
     { name = "kazoo" },
@@ -889,6 +899,7 @@ dependencies = [
     { name = "orjson" },
     { name = "psutil" },
     { name = "pympler" },
+    { name = "throttled-py", extra = ["all"] },
     { name = "uvloop", marker = "sys_platform != 'win32'" },
 ]
 
@@ -902,6 +913,7 @@ zookeeper = [
 
 [package.metadata]
 requires-dist = [
+    { name = "blinker", specifier = ">=1.9.0" },
     { name = "cachetools", specifier = ">=6.2.1" },
     { name = "h2", specifier = ">=4.1.0" },
     { name = "kazoo", specifier = ">=2.10.0" },
@@ -911,6 +923,7 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.11.4" },
     { name = "psutil", specifier = ">=6.0.0" },
     { name = "pympler", specifier = ">=1.1" },
+    { name = "throttled-py", extras = ["all"], specifier = ">=2.2.3" },
     { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.19.0" },
 ]
 provides-extras = ["nacos", "zookeeper"]
@@ -1549,6 +1562,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyjwt"
+version = "2.10.1"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/e7/46/bd74733ff231675599650d3e47f361794b22ef3e3770998dda30d3b63726/pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb" },
+]
+
+[[package]]
 name = "pympler"
 version = "1.1"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -1586,6 +1608,19 @@ wheels = [
 ]
 
 [[package]]
+name = "redis"
+version = "5.3.1"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+dependencies = [
+    { name = "async-timeout", marker = "python_full_version < '3.11.3'" },
+    { name = "pyjwt" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/6a/cf/128b1b6d7086200c9f387bd4be9b2572a30b90745ef078bd8b235042dc9f/redis-5.3.1.tar.gz", hash = "sha256:ca49577a531ea64039b5a36db3d6cd1a0c7a60c34124d46924a45b956e8cf14c" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/7f/26/5c5fa0e83c3621db835cfc1f1d789b37e7fa99ed54423b5f519beb931aa7/redis-5.3.1-py3-none-any.whl", hash = "sha256:dc1909bd24669cc31b5f67a039700b16ec30571096c5f1f0d9d2324bff31af97" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -1598,6 +1633,20 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/c9/74/b3ff8e6c8446842c3f5c837e9c3dfcfe2018ea6ecef224c710c85ef728f4/requests-2.32.5.tar.gz", hash = "sha256:dbba0bac56e100853db0ea71b82b4dfd5fe2bf6d3754a8893c3af500cec7d7cf" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl", hash = "sha256:2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6" },
+]
+
+[[package]]
+name = "throttled-py"
+version = "2.2.3"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/50/84/8d698ade3f573db31a4d8b91de81b674cc313e0a07b5bcc76e49e8e867e9/throttled_py-2.2.3.tar.gz", hash = "sha256:c50c80bb08f109d83ea70c9cf39eb705b5ef4b7e360cb59138ddef04707465ff" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/06/1b/d9006f4086ccf3b03ee4233f9a5d4720e0155193066627e8ff0e3637491f/throttled_py-2.2.3-py3-none-any.whl", hash = "sha256:cd1ba8da8a48ffe8d551bd7136e21e083a97b8f0ebfcd61fab3475b47c37b589" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "redis" },
 ]
 
 [[package]]

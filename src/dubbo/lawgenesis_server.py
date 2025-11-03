@@ -20,8 +20,8 @@ import orjson
 
 from dubbo import Dubbo, Server
 from dubbo.cache.cache_client import CacheClient
-from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig
-from dubbo.configs import ServiceConfig, RegistryConfig, NotifyConfig
+from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig, NotifyConfig
+from dubbo.configs import ServiceConfig, RegistryConfig
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto import (
     LLMProtobuf,
@@ -33,6 +33,8 @@ from dubbo.lawgenesis_proto import (
 from dubbo.lawgenesis_proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
 from dubbo.lawgenesis_proto.rpc import rpc_server
+from dubbo.limit._interface import RateLimitKeyConfig
+from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
@@ -40,7 +42,7 @@ from dubbo.proxy.handlers import RpcServiceHandler
 
 _LOGGER = loggerFactory.get_logger()
 cache_map: dict[str, CacheClient] = {}
-
+limit_map: dict[str, LocalLimit] = {}
 # 映射不同类型的数据到对应的 Protobuf 类
 protobuf_type_map = {
     "txt": TxtProtobuf,
@@ -67,6 +69,9 @@ class LawgenesisService:
         self._server_metadata: ServerMetaData = self.server_metadata()
         self.method_handlers = []
         self.subscribe_task = []
+        async_thread = threading.Thread(target=self._start_loop, daemon=True)
+        async_thread.start()
+        time.sleep(1)
 
     @property
     def intranet_ip(self):
@@ -187,28 +192,39 @@ class LawgenesisService:
                         BADA=law_basedata.basedata,
                         Response=response_data,
                     )
-                # todo 鉴权
-                if not self.check_auth(law_basedata.auth):
+                # 鉴权
+                auth_info = LawAuthInfo(law_basedata.auth)
+                if not self.check_auth(auth_info):
+                    _LOGGER.error(f"{method_name} auth error")
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
-                        DATA=ResponseProto(data="auth error",
+                        Response=ResponseProto(data="auth error",
                                            context_id=serialize_func.context_id,
                                            code=GRpcCode.UNAUTHENTICATED.value).to_bytes(),
                     )
-                # todo 流控
+                # 流控
+                limited_result = self.check_limit(method_name=method_name, key=auth_info.auth_id)
+                if not limited_result:
+                    _LOGGER.error(f"{method_name} limited")
+                    return lawgenesis_pb2.LawgenesisReply(
+                        BADA=law_basedata.basedata,
+                        Response=ResponseProto(data="limited",
+                                           context_id=serialize_func.context_id,
+                                           code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes(),
+                    )
 
-
-                # todo 缓存
-                response_data = self.get_cache(method_name=method_name, key=serialize_func.cache_key)
+                # 缓存
+                response_data = self.get_cache(method_name=method_name, key=serialize_func.cache_key) if law_basedata.is_cache else None
                 if response_data:
                     _LOGGER.info(f"{method_name} cache hit, key: {serialize_func.cache_key}")
+                    cache_map[method_name] = CacheClient(_method_config.cache(method_name=method_name))
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
                         Response=response_data,
                     )
 
                 try:
-                    response = func(serialize_func)
+                    response = func(serialize_func, law_basedata)
                     if not isinstance(response, dict):
                         _LOGGER.error(f"{method_name} response_data must be a dict")
                         response_data = ResponseProto(data="response_data must be a dict",
@@ -241,6 +257,7 @@ class LawgenesisService:
             _method_config = method_config or self.law_method_config
             self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
             # 注册缓存器
+            limit_map[method_name] = LocalLimit(limit_config={})
             cache_map[method_name] = CacheClient(_method_config.cache(method_name=method_name))
             return wrapper
 
@@ -257,12 +274,18 @@ class LawgenesisService:
         return cache_client.set(key, value)
 
     @staticmethod
-    def check_auth(auth_info: lawgenesis_pb2.Auth) -> bool:
-        info = LawAuthInfo(auth_info)
-        if info.auth_key != "lawgenesis":
+    def check_auth(auth_info: LawAuthInfo) -> bool:
+        if auth_info.auth_key != "lawgenesis":
             return False
         return True
-
+    @staticmethod
+    def check_limit(method_name,  key) -> bool:
+        limited_client = limit_map.get(method_name)
+        limite_result = limited_client.limit(key=key)
+        if limite_result.limited:
+            _LOGGER.error(f"{method_name} limited, {limite_result._state_values}")
+            return False
+        return True
 
     async def subscribe(self):
         """"""
@@ -281,16 +304,12 @@ class LawgenesisService:
         loop.create_task(self.subscribe())
 
         # 3. 启动循环，这将阻塞此线程直到循环停止
-        print("异步后台线程已启动事件循环。")
+        _LOGGER.info("异步后台线程已启动事件循环。")
         loop.run_forever()
 
     def start(self):
         """启动服务：在后台启动异步任务，然后启动主同步服务"""
         # 1. 创建并启动线程来运行异步循环
-        async_thread = threading.Thread(target=self._start_loop, daemon=True)
-        async_thread.start()
-        # 跑太快了，导致配置没获取到
-        time.sleep(1)
         self.server.start()
         while True:
             time.sleep(1)
