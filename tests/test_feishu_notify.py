@@ -27,7 +27,7 @@ async def main():
     server_notify_data = ServerMetaData(server_name="test", status="进行中", start_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), host="127.0.0.1", port=8080, intranet_ip="127.0.0.1", internet_ip="127.0.0.1")
 
 
-    await feishu.send_table(title="test", subtitle="test", elements=[server_notify_data])
+    await feishu.async_send_table(title="test", subtitle="test", elements=[server_notify_data])
 
 if __name__ == '__main__':
     asyncio.run(main())

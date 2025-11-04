@@ -306,7 +306,7 @@ class MethodRateLimitConfig:
         self.limits_storge = limits_storge
 
         self.limits_storge_url = limits_storge_url
-        self.limits_storge_options = ast.literal_eval(limits_storge_options)
+        self.limits_storge_options = ast.literal_eval(limits_storge_options) if isinstance(limits_storge_options, str) else limits_storge_options
         self.limits_keys_operation: Dict[str, RateLimitKeyConfig] = {}
 
         for method_name, value in limits_keys_operation.items():

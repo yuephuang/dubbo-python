@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import asyncio
 import threading
 import uuid
 from abc import ABC
@@ -165,7 +166,7 @@ class NoticeFactory(ABC):
             # 通知不报错
 
     @abc.abstractmethod
-    async def send_text(self, text):
+    async def async_send_text(self, text):
         """
         Send data to the notice.
         :param text: The content to send.
@@ -173,13 +174,13 @@ class NoticeFactory(ABC):
         """
 
     @abc.abstractmethod
-    async def send_rich_text(self, title, content: List[List[Dict[str, str]]]):
+    async def async_send_rich_text(self, title, content: List[List[Dict[str, str]]]):
         """
 
         """
 
 
-    async def send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
+    async def async_send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
         """
         Send data to the notice.
         :param title: The title of the notice.
@@ -187,3 +188,30 @@ class NoticeFactory(ABC):
         :param elements: The elements of the notice.
         :return: The response.
         """
+
+    def send_text(self, text):
+        """
+        Send data to the notice.
+        :param text: The content to send.
+        :return: The response.
+        """
+        asyncio.run(self.async_send_text(text))
+
+    def send_rich_text(self, title, content: List[List[Dict[str, str]]]):
+        """
+        Send data to the notice.
+        :param title: The title of the notice.
+        :param content: The content of the notice.
+        :return: The response.
+        """
+        asyncio.run(self.async_send_rich_text(title, content))
+
+    def send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
+        """
+        Send data to the notice.
+        :param title: The title of the notice.
+        :param subtitle: The subtitle of the notice.
+        :param elements: The elements of the notice.
+        :return: The response.
+        """
+        asyncio.run(self.async_send_table(title, subtitle, elements))

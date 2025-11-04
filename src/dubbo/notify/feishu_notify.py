@@ -29,7 +29,7 @@ class FeiShuNotify(NoticeFactory):
             "Content-Type": "application/json"
         }
 
-    async def send_text(self, text):
+    async def async_send_text(self, text):
         """
         发送文本消息
         """
@@ -41,7 +41,7 @@ class FeiShuNotify(NoticeFactory):
         }
         return await self.async_send_data(data)
 
-    async def send_rich_text(self, title, content: List[List[Dict[str, str]]]):
+    async def async_send_rich_text(self, title, content: List[List[Dict[str, str]]]):
         """
         发送富文本消息
         """
@@ -85,7 +85,7 @@ class FeiShuNotify(NoticeFactory):
       }
         return await self.async_send_data(data)
 
-    async def send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
+    async def async_send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
         """
         将json 数据变成表格发布
         """
