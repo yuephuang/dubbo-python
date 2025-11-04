@@ -72,7 +72,7 @@ class NoticeFactory(ABC):
                 cls._instance[kwargs.get("url")] = super().__new__(cls)
         return cls._instance[kwargs.get("url")]
 
-    def __init__(self, url: str, header: Dict[str, str] = None, server_name: str="dubbo-server"):
+    def __init__(self, url: str=None, header: Dict[str, str] = None, server_name: str="dubbo-server"):
         """
         Initialize the notice.
         :param url: The url of the notice.

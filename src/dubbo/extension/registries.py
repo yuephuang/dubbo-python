@@ -24,6 +24,7 @@ from dubbo.notify import NoticeFactory
 from dubbo.protocol import Protocol
 from dubbo.registry import RegistryFactory
 from dubbo.remoting import Transporter
+from dubbo.lawgenesis_proto import ProtobufInterface
 
 
 @dataclass
@@ -126,3 +127,12 @@ notifyFactoryRegistry = ExtendedRegistry(
     },
 )
 
+
+lawgenesisProto = ExtendedRegistry(
+    interface=ProtobufInterface,
+    impls={
+    "txt": "dubbo.lawgenesis_proto.txt_protobuf.TxtProtobuf",
+    "llm": "dubbo.lawgenesis_proto.llm_protobuf.LLMProtobuf",
+    "file": "dubbo.lawgenesis_proto.file_protobuf.FileProtobuf",
+    },
+)

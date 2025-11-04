@@ -369,18 +369,19 @@ class LawMethodConfig(ConfigReloader):
             limits_keys_operation = limits_item.get("limits_keys_operation", {})
         )
 
-class NotifyConfig:
+class NotifyConfig(ConfigReloader):
     """
     The notify configuration.
     """
-    def __init__(self, url: str="", notify_type="feishu"):
+    def __init__(self):
         """
         Initialize the notify configuration.
         :param url: The notify url.
         :type notify_type: str
         """
-        self.url = url or os.environ.get("notify_url")
-        self.notify_type = notify_type
+        super().__init__()
+        self.config_name = "notify"
+        self.url = ""
 
 # todo， 后续用single 来通知配置变化
 

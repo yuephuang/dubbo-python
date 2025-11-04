@@ -176,7 +176,7 @@ class ResponseProto:
         return {
             "data": self.data,
             "context_id": self.context_id,
-            "code": self.code.http_code if not isinstance(self.code, int) else self.code,
+            "code": self.code,
         }
 
     def to_bytes(self):

@@ -24,9 +24,6 @@ from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig,
 from dubbo.configs import ServiceConfig, RegistryConfig
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto import (
-    LLMProtobuf,
-    FileProtobuf,
-    TxtProtobuf,
     ProtobufInterface,
     ResponseProto,
 )
@@ -43,13 +40,6 @@ _LOGGER = loggerFactory.get_logger()
 cache_map: dict[str, CacheClient] = {}
 limit_map: dict[str, LocalLimit] = {}
 # 映射不同类型的数据到对应的 Protobuf 类
-protobuf_type_map = {
-    "txt": TxtProtobuf,
-    "file": FileProtobuf,
-    "llm": LLMProtobuf,
-    "base": ProtobufInterface,
-}
-
 class LawgenesisService:
     """
     表示一个 Dubbo 服务，可以暴露方法并处理请求。
@@ -57,19 +47,21 @@ class LawgenesisService:
 
     def __init__(self, law_server_config: LawServerConfig = LawServerConfig(),
                  method_config: LawMethodConfig = LawMethodConfig(),
-                 notify_config: NotifyConfig = NotifyConfig(),
+                 notify_config: NotifyConfig = None,
                  ):
         self.law_server_config = law_server_config
         self.law_method_config = method_config
-        self.notify_factory: Optional[NoticeFactory] = extensionLoader.get_extension(
-            NoticeFactory, notify_config.notify_type
-        )(notify_config.url)
-        self.notify_factory.server_name = self.law_server_config.name
+
         self._server_metadata: ServerMetaData = self.server_metadata()
         self.method_handlers = []
         self.subscribe_task = []
+        self.notify_config = notify_config or NotifyConfig()
         async_thread = threading.Thread(target=self._start_loop, daemon=True)
         async_thread.start()
+        self.notify_factory: Optional[NoticeFactory] = extensionLoader.get_extension(NoticeFactory, "feishu")()
+        self.notify_factory.server_name = self.law_server_config.name
+        self.notify_factory.url = self.notify_config.url
+        self.run = True
         time.sleep(1)
 
     @property
@@ -172,10 +164,8 @@ class LawgenesisService:
             """
             @wraps(func)
             def wrapper(request: lawgenesis_pb2.LawgenesisRequest) -> lawgenesis_pb2.LawgenesisReply:
-                response_data: ResponseProto = ResponseProto()
                 st = time.perf_counter()
-                # todo 这里用extensionLoader 获取
-                protobuf_interface = protobuf_type_map.get(protobuf_type)
+                protobuf_interface = extensionLoader.get_extension(ProtobufInterface, protobuf_type)
                 law_basedata = LawMetaData(request.BADA)
                 request_data = orjson.loads(request.DATA)
                 serialize_func = protobuf_interface(request_data)
@@ -185,39 +175,30 @@ class LawgenesisService:
                     _LOGGER.error(err_msg)
                     response_data = ResponseProto(data={"message": err_msg}, context_id=serialize_func.context_id,
                                                   code=GRpcCode.INVALID_ARGUMENT.value).to_bytes()
-                    return lawgenesis_pb2.LawgenesisReply(
-                        BADA=law_basedata.basedata,
-                        Response=response_data,
-                    )
+                    return self.response(base_data=law_basedata.basedata, data=response_data,)
                 # 鉴权
                 auth_info = LawAuthInfo(law_basedata.auth)
                 if not self.check_auth(auth_info):
                     _LOGGER.error(f"{method_name} auth error")
-                    return lawgenesis_pb2.LawgenesisReply(
-                        BADA=law_basedata.basedata,
-                        Response=ResponseProto(data="auth error",
-                                           context_id=serialize_func.context_id,
-                                           code=GRpcCode.UNAUTHENTICATED.value).to_bytes(),
+                    return self.response(
+                        base_data=law_basedata.basedata,
+                        data=ResponseProto(
+                            data="auth error", context_id=serialize_func.context_id, code=GRpcCode.UNAUTHENTICATED.value).to_bytes(),
                     )
                 # 流控
                 limited_result = self.check_limit(method_name=method_name, key=auth_info.auth_id)
                 if not limited_result:
                     _LOGGER.error(f"{method_name} limited")
-                    return lawgenesis_pb2.LawgenesisReply(
-                        BADA=law_basedata.basedata,
-                        Response=ResponseProto(data="limited",
-                                           context_id=serialize_func.context_id,
-                                           code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes(),
+                    return self.response(
+                        base_data=law_basedata.basedata, data=ResponseProto(
+                            data="limited", context_id=serialize_func.context_id, code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes(),
                     )
 
                 # 缓存
                 response_data = self.get_cache(method_name=method_name, key=serialize_func.cache_key) if law_basedata.is_cache else None
                 if response_data:
                     _LOGGER.info(f"{method_name} cache hit, key: {serialize_func.cache_key}")
-                    return lawgenesis_pb2.LawgenesisReply(
-                        BADA=law_basedata.basedata,
-                        Response=response_data,
-                    )
+                    return self.response(base_data=law_basedata.basedata, data=response_data)
 
                 try:
                     response = func(serialize_func, law_basedata)
@@ -226,25 +207,18 @@ class LawgenesisService:
                         response_data = ResponseProto(data="response_data must be a dict",
                                                        context_id=serialize_func.context_id,
                                                        code=GRpcCode.INTERNAL.value).to_bytes()
-                        return lawgenesis_pb2.LawgenesisReply(
-                            BADA=law_basedata.basedata,
-                            Response=response_data,
-                        )
+                        return self.response(base_data=law_basedata.basedata, data=response_data)
+
                     response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
                                                   code=GRpcCode.OK.value).to_bytes()
                     self.set_cache(method_name=method_name, key=serialize_func.cache_key, value=response_data)
-                    return lawgenesis_pb2.LawgenesisReply(
-                        BADA=law_basedata.basedata,
-                        Response=response_data,
-                    )
+                    return self.response(base_data=law_basedata.basedata, data=response_data)
+
                 except Exception as e:
                     response_data = ResponseProto(data=str(e), context_id=serialize_func.context_id,
                                                   code=GRpcCode.UNAVAILABLE.value).to_bytes()
                     _LOGGER.error(f"{method_name} error: {e}")
-                    return lawgenesis_pb2.LawgenesisReply(
-                        BADA=law_basedata.basedata,
-                        Response=response_data,
-                    )
+                    return self.response(base_data=law_basedata.basedata, data=response_data)
                 finally:
                     et = time.perf_counter()
                     _LOGGER.info(f"{method_name} end, end_time: {et}, cost: {et - st}, trace_id: {law_basedata.trace_id}")
@@ -259,6 +233,14 @@ class LawgenesisService:
             return wrapper
 
         return decorator
+
+    @staticmethod
+    def response(base_data: lawgenesis_pb2.BaseData, data: bytes) -> lawgenesis_pb2.LawgenesisReply:
+        return lawgenesis_pb2.LawgenesisReply(
+            BADA=base_data,
+            Response=data,
+        )
+
 
     @staticmethod
     def get_cache(method_name, key):
@@ -288,6 +270,7 @@ class LawgenesisService:
         """"""
         await self.law_server_config.async_start_reloader()
         await self.law_method_config.async_start_reloader()
+        await self.notify_config.async_start_reloader()
         while True:
             await asyncio.sleep(1)
 
@@ -299,14 +282,26 @@ class LawgenesisService:
 
         # 2. 在新循环中创建并启动任务
         loop.create_task(self.subscribe())
-
         # 3. 启动循环，这将阻塞此线程直到循环停止
         _LOGGER.info("异步后台线程已启动事件循环。")
         loop.run_forever()
 
-    def start(self):
+    async def async_start(self):
         """启动服务：在后台启动异步任务，然后启动主同步服务"""
         # 1. 创建并启动线程来运行异步循环
+
         self.server.start()
-        while True:
-            time.sleep(1)
+        await self.notify_factory.send_table(
+            title="🟢服务启动", subtitle=self.law_server_config.name, elements=[self.server_metadata()]
+        )
+        while self.run:
+            await asyncio.sleep(1)
+            break
+
+        await self.notify_factory.send_table(
+            title="🔴服务停止", subtitle=self.law_server_config.name, elements=[self.server_metadata()]
+        )
+
+    def start(self):
+        """启动服务"""
+        asyncio.run(self.async_start())
