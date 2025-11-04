@@ -115,6 +115,7 @@ configCenterRegistry = ExtendedRegistry(
     interface=Config,
     impls={
         "nacos": "dubbo.config_center.nacos.nacos_config_center.NacosConfigCenter",
+        "local": "dubbo.config_center.local.local_config_center.LocalConfigCenter",
     },
 )
 
@@ -124,3 +125,4 @@ notifyFactoryRegistry = ExtendedRegistry(
         "feishu": "dubbo.notify.FeiShuNotify",
     },
 )
+

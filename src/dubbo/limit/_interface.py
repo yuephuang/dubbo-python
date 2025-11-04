@@ -3,35 +3,19 @@ from abc import ABC
 from datetime import timedelta
 from typing import Dict
 
-from throttled import Throttled, RateLimitResult, rate_limiter
+from throttled import Throttled, RateLimitResult, rate_limiter, RateLimiterType
 
-
-class RateLimitKeyConfig:
-    """
-    RateLimitKeyConfig
-    给每个key设置 不同的限流策略，如果没有，则默认为key
-    """
-    def __init__(self,limits_strategies: str="fixed_window", limits_storge_amount: int=2, limits_storge_multiples: int=10):
-        """
-        初始化一个 RateLimitKeyConfig 实例。
-        注意，这个是针对某个用户或者某个使用方
-        Args:
-            limits_strategies (str): RateLimitKey的策略，可选 "fixed_window" (固定窗口) 或 "sliding_window" (滑动窗口) 或 "leaking_bucket" (漏桶) 或 "token_bucket" (令牌桶) 或 "gcra"
-            limits_storge_amount (int): 速率限制存储的额度，如 redis 存储的额度
-            limits_storge_multiples (int): 速率限制存储的倍数，如 redis 存储的倍数
-        """
-        self.limits_strategies = limits_strategies
-        self.limits_storge_amount = limits_storge_amount
-        self.limits_storge_multiples = limits_storge_multiples
-
+from dubbo.configcenter.lawgenes_config import RateLimitKeyConfig
 
 
 class RataLimitFactory(ABC):
     """
     RataLimitFactory
     """
-    def __init__(self, limit_config: Dict[str, RateLimitKeyConfig]):
+    def __init__(self, limit_config: Dict[str, RateLimitKeyConfig], server: str="", options: Dict=None):
         self.limit_config = limit_config
+        self.server = server
+        self.options = options
         self.limit_client = {"common": self.fixed_window(100, 10)}
         for key, value in self.limit_config.items():
             if value.limits_strategies == "fixed_window":
@@ -47,46 +31,51 @@ class RataLimitFactory(ABC):
             else:
                 self.limit_client[key] = self.fixed_window(value.limits_storge_amount, value.limits_storge_multiples)
 
-    @abc.abstractmethod
     def fixed_window(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
-        """
-        fixed_window
-        """
-        pass
+        return Throttled(
+            store=self.store(),
+            using=RateLimiterType.FIXED_WINDOW.value,
+            quota=self.quate(limits_storge_amount, limits_storge_multiples),
+            )
 
-    @abc.abstractmethod
     def sliding_window(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
-        """
-        sliding_window
-        """
-        pass
+        return Throttled(
+            store=self.store(),
+            using=RateLimiterType.SLIDING_WINDOW.value,
+            quota=self.quate(limits_storge_amount, limits_storge_multiples),
+        )
 
-    @abc.abstractmethod
     def token_bucket(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
-        """
-        token_bucket
-        """
-        pass
+        return Throttled(
+            store=self.store(),
+            using=RateLimiterType.TOKEN_BUCKET.value,
+            quota=self.quate(limits_storge_amount, limits_storge_multiples),
+        )
 
-
-    @abc.abstractmethod
-    def leaky_bucket(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
-        """
-        leaky_bucket
-        """
-        pass
-
-    @abc.abstractmethod
     def gcra(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
-        """
-        gcra
-        """
-        pass
+        return Throttled(
+            store=self.store(),
+            using=RateLimiterType.GCRA.value,
+            quota=self.quate(limits_storge_amount, limits_storge_multiples),
+        )
+
+    def leaky_bucket(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
+        return Throttled(
+            store=self.store(),
+            using=RateLimiterType.LEAKING_BUCKET.value,
+            quota=self.quate(limits_storge_amount, limits_storge_multiples),
+        )
+
 
     def limit(self, key: str) -> RateLimitResult:
         throttled_client = self.limit_client.get(key)
         if not throttled_client:
             throttled_client = self.limit_client["common"]
+        # 如果没有开启限流，则不限流
+        if self.limit_config.get(key) and self.limit_config.get(key).limits_enable:
+            pass
+        else:
+            return RateLimitResult(False, "")
         return throttled_client.limit(key=key)
 
     @staticmethod
@@ -96,3 +85,6 @@ class RataLimitFactory(ABC):
             limit=limits_storge_amount
         )
         return quota
+
+    def store(self):
+        pass

@@ -33,7 +33,6 @@ from dubbo.lawgenesis_proto import (
 from dubbo.lawgenesis_proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
 from dubbo.lawgenesis_proto.rpc import rpc_server
-from dubbo.limit._interface import RateLimitKeyConfig
 from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory
 from dubbo.notify import NoticeFactory, ServerMetaData
@@ -142,9 +141,11 @@ class LawgenesisService:
         创建并返回一个 Dubbo 服务器实例。
         它根据是否提供了注册中心 URL 来配置服务器。
         """
+        service_config = ServiceConfig(service_handler=self.service_handler(), host=self.law_server_config.host,
+                                       port=self.law_server_config.port)
         if self.law_server_config.register_center_url:
             # 如果提供了注册中心，则使用 Dubbo 引导程序进行注册
-            service_config = ServiceConfig(service_handler=self.service_handler())
+
             registry_config = RegistryConfig.from_url(self.law_server_config.register_center_url)
             registry_config.group = self.law_server_config._group
             registry_config.version = self.law_server_config.version
@@ -152,10 +153,6 @@ class LawgenesisService:
             return bootstrap.create_server(service_config)
         else:
             # 否则，创建一个独立的 Dubbo 服务器
-            service_config = ServiceConfig(
-                service_handler=self.service_handler(), host=self.law_server_config.host,
-                port=self.law_server_config.port
-            )
             return Server(service_config)
 
     def service_handler(self) -> RpcServiceHandler:
@@ -217,7 +214,6 @@ class LawgenesisService:
                 response_data = self.get_cache(method_name=method_name, key=serialize_func.cache_key) if law_basedata.is_cache else None
                 if response_data:
                     _LOGGER.info(f"{method_name} cache hit, key: {serialize_func.cache_key}")
-                    cache_map[method_name] = CacheClient(_method_config.cache(method_name=method_name))
                     return lawgenesis_pb2.LawgenesisReply(
                         BADA=law_basedata.basedata,
                         Response=response_data,
@@ -257,7 +253,8 @@ class LawgenesisService:
             _method_config = method_config or self.law_method_config
             self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
             # 注册缓存器
-            limit_map[method_name] = LocalLimit(limit_config={})
+            limit_map[method_name] = LocalLimit(
+                limit_config=_method_config.rate_limit(method_name=method_name).limits_keys_operation)
             cache_map[method_name] = CacheClient(_method_config.cache(method_name=method_name))
             return wrapper
 

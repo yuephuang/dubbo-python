@@ -255,6 +255,25 @@ class MethodRetryConfig:
         """
         return hash((self.retry_enable, self.retry_num, self.retry_interval))
 
+class RateLimitKeyConfig:
+    """
+    RateLimitKeyConfig
+    给每个key设置 不同的限流策略，如果没有，则默认为key
+    """
+    def __init__(self, limits_enable=True, limits_strategies: str="fixed_window", limits_storge_amount: int=2, limits_storge_multiples: int=10):
+        """
+        初始化一个 RateLimitKeyConfig 实例。
+        注意，这个是针对某个用户或者某个使用方
+        Args:
+            limits_strategies (str): RateLimitKey的策略，可选 "fixed_window" (固定窗口) 或 "sliding_window" (滑动窗口) 或 "leaking_bucket" (漏桶) 或 "token_bucket" (令牌桶) 或 "gcra"
+            limits_storge_amount (int): 速率限制存储的额度，如 redis 存储的额度
+            limits_storge_multiples (int): 速率限制存储的倍数，如 redis 存储的倍数
+        """
+        self.limits_enable = limits_enable
+        self.limits_strategies = limits_strategies
+        self.limits_storge_amount = limits_storge_amount
+        self.limits_storge_multiples = limits_storge_multiples
+
 class MethodRateLimitConfig:
     """
     速率限制配置类。
@@ -267,7 +286,7 @@ class MethodRateLimitConfig:
     VALID_STORAGES = {"memory", "redis"}
 
     def __init__(self, limits_enable: bool, limits_storge: str, limits_storge_url: str,
-                 limits_storge_options: Union[str, Dict[str, Any]], limits_keys_operation: Dict[str, Any]
+                 limits_storge_options: Union[str, Dict[str, Any]], limits_keys_operation: Dict[str, dict]
                  ):
         """
         初始化一个 RateLimitConfig 实例。
@@ -288,7 +307,10 @@ class MethodRateLimitConfig:
 
         self.limits_storge_url = limits_storge_url
         self.limits_storge_options = ast.literal_eval(limits_storge_options)
-        self.limits_keys_operation = limits_keys_operation
+        self.limits_keys_operation: Dict[str, RateLimitKeyConfig] = {}
+
+        for method_name, value in limits_keys_operation.items():
+            self.limits_keys_operation[method_name] = RateLimitKeyConfig(**value)
 
     def hash_code(self):
         """
@@ -311,6 +333,9 @@ class LawMethodConfig(ConfigReloader):
         self.method_name_map = {}
         self.config_name = "method"
         self.protobuf_type = "txt"
+        self._cache = None
+        self._rate = None
+        self._rate_limit = None
 
     @staticmethod
     def single_send():
