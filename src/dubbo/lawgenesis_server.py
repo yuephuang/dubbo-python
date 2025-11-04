@@ -296,7 +296,6 @@ class LawgenesisService:
         )
         while self.run:
             await asyncio.sleep(1)
-            break
 
         await self.notify_factory.send_table(
             title="🔴服务停止", subtitle=self.law_server_config.name, elements=[self.server_metadata()]
