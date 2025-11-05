@@ -49,7 +49,7 @@ class _InvokeClient:
     def invoke(self, method_name: str, request_data :"ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
         metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
         metadata.data_type = request_data.protobuf_type
-        metadata.is_cache = True
+        # metadata.is_cache = True
         metadata.auth = self.get_authorization()
         law_request = lawgenesis_pb2.LawgenesisRequest(
             DATA=request_data.param2bytes,

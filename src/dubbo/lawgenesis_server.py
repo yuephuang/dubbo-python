@@ -15,6 +15,7 @@ import os
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 from functools import wraps
 from typing import Union, Callable, Optional
 
@@ -35,7 +36,7 @@ from dubbo.lawgenesis_proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
-from dubbo.loggers import loggerFactory
+from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
 from dubbo.proxy.handlers import RpcServiceHandler
@@ -48,6 +49,22 @@ cache_map: dict[str, CacheClient] = {}
 # 限流器映射：{method_name: LocalLimit}
 limit_map: dict[str, LocalLimit] = {}
 
+
+@contextmanager
+def trace_context_manager(trace_id, context_id):
+    """
+    一个用于设置和清除 trace_id 的上下文管理器。
+    """
+    # 1. 记录旧的值 (Token)
+    # ContextVar.set() 会返回一个用于恢复之前值的 Token
+    token = TRACE_ID.set(trace_id)
+    context = CONTEXT_ID.set(context_id)
+    try:
+        yield
+    finally:
+        # 3. 恢复到旧的值
+        TRACE_ID.reset(token)
+        CONTEXT_ID.reset(context)
 
 class LawgenesisService:
     """
@@ -232,77 +249,77 @@ class LawgenesisService:
                 law_basedata = LawMetaData(request.BADA)
                 request_data = orjson.loads(request.DATA)
                 serialize_func = protobuf_interface(request_data)
+                with trace_context_manager(trace_id=law_basedata.trace_id, context_id=serialize_func.context_id):
+                    _LOGGER.info(f"{method_name} start, start_time: {st}, trace_id: {law_basedata.trace_id}")
 
-                _LOGGER.info(f"{method_name} start, start_time: {st}, trace_id: {law_basedata.trace_id}")
+                    # 1. 检查数据类型
+                    if law_basedata.data_type != protobuf_type:
+                        err_msg = f"{method_name} data_type error, expect: {protobuf_type}, actual: {law_basedata.data_type}"
+                        _LOGGER.error(err_msg)
+                        response_data = ResponseProto(data={"message": err_msg}, context_id=serialize_func.context_id,
+                                                      code=GRpcCode.INVALID_ARGUMENT.value).to_bytes()
+                        return self.response(base_data=law_basedata.basedata, data=response_data, )
 
-                # 1. 检查数据类型
-                if law_basedata.data_type != protobuf_type:
-                    err_msg = f"{method_name} data_type error, expect: {protobuf_type}, actual: {law_basedata.data_type}"
-                    _LOGGER.error(err_msg)
-                    response_data = ResponseProto(data={"message": err_msg}, context_id=serialize_func.context_id,
-                                                  code=GRpcCode.INVALID_ARGUMENT.value).to_bytes()
-                    return self.response(base_data=law_basedata.basedata, data=response_data, )
+                    # 2. 鉴权
+                    auth_info = LawAuthInfo(law_basedata.auth)
+                    if not self.check_auth(auth_info):
+                        _LOGGER.error(f"{method_name} auth error, trace_id: {law_basedata.trace_id}")
+                        return self.response(
+                            base_data=law_basedata.basedata,
+                            data=ResponseProto(
+                                data="auth error", context_id=serialize_func.context_id,
+                                code=GRpcCode.UNAUTHENTICATED.value).to_bytes(),
+                        )
 
-                # 2. 鉴权
-                auth_info = LawAuthInfo(law_basedata.auth)
-                if not self.check_auth(auth_info):
-                    _LOGGER.error(f"{method_name} auth error, trace_id: {law_basedata.trace_id}")
-                    return self.response(
-                        base_data=law_basedata.basedata,
-                        data=ResponseProto(
-                            data="auth error", context_id=serialize_func.context_id,
-                            code=GRpcCode.UNAUTHENTICATED.value).to_bytes(),
-                    )
+                    # 3. 流控
+                    limited_result = self.check_limit(method_name=method_name, key=auth_info.auth_id)
+                    if not limited_result:
+                        _LOGGER.error(f"{method_name} limited, trace_id: {law_basedata.trace_id}")
+                        return self.response(
+                            base_data=law_basedata.basedata, data=ResponseProto(
+                                data="limited", context_id=serialize_func.context_id,
+                                code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes(),
+                        )
 
-                # 3. 流控
-                limited_result = self.check_limit(method_name=method_name, key=auth_info.auth_id)
-                if not limited_result:
-                    _LOGGER.error(f"{method_name} limited, trace_id: {law_basedata.trace_id}")
-                    return self.response(
-                        base_data=law_basedata.basedata, data=ResponseProto(
-                            data="limited", context_id=serialize_func.context_id,
-                            code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes(),
-                    )
-
-                # 4. 缓存获取
-                response_data = self.get_cache(method_name=method_name,
-                                               key=serialize_func.cache_key) if law_basedata.is_cache else None
-                if response_data:
-                    _LOGGER.info(
-                        f"{method_name} cache hit, key: {serialize_func.cache_key}, trace_id: {law_basedata.trace_id}")
-                    return self.response(base_data=law_basedata.basedata, data=response_data)
-
-                _LOGGER.info(
-                    f"{method_name} cache miss, key: {serialize_func.cache_key}, trace_id: {law_basedata.trace_id}")
-
-                # 5. 执行业务逻辑
-                try:
-                    response = func(serialize_func, law_basedata)
-                    if not isinstance(response, dict):
-                        _LOGGER.error(
-                            f"{method_name} response_data must be a dict, but got {type(response)}, trace_id: {law_basedata.trace_id}")
-                        response_data = ResponseProto(data="response_data must be a dict",
-                                                      context_id=serialize_func.context_id,
-                                                      code=GRpcCode.INTERNAL.value).to_bytes()
+                    # 4. 缓存获取
+                    response_data = self.get_cache(method_name=method_name,
+                                                   key=serialize_func.cache_key) if law_basedata.is_cache else None
+                    if response_data:
+                        _LOGGER.info(
+                            f"{method_name} cache hit, key: {serialize_func.cache_key}, trace_id: {law_basedata.trace_id}")
                         return self.response(base_data=law_basedata.basedata, data=response_data)
 
-                    # 6. 构造成功响应并设置缓存
-                    response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
-                                                  code=GRpcCode.OK.value).to_bytes()
-                    self.set_cache(method_name=method_name, key=serialize_func.cache_key, value=response_data)
-                    return self.response(base_data=law_basedata.basedata, data=response_data)
-
-                except Exception as e:
-                    # 7. 异常处理
-                    # 关键优化：exc_info=True 会将完整的堆栈跟踪记录到日志中
-                    _LOGGER.error(f"{method_name} error: {e}, trace_id: {law_basedata.trace_id}", exc_info=True)
-                    response_data = ResponseProto(data=str(e), context_id=serialize_func.context_id,
-                                                  code=GRpcCode.UNAVAILABLE.value).to_bytes()
-                    return self.response(base_data=law_basedata.basedata, data=response_data)
-                finally:
-                    et = time.perf_counter()
                     _LOGGER.info(
-                        f"{method_name} end, end_time: {et}, cost: {et - st:.4f}s, trace_id: {law_basedata.trace_id}")
+                        f"{method_name} cache miss, key: {serialize_func.cache_key}, trace_id: {law_basedata.trace_id}")
+
+                    # 5. 执行业务逻辑
+                    try:
+                        response = func(serialize_func, law_basedata)
+                        if not isinstance(response, dict):
+                            _LOGGER.error(
+                                f"{method_name} response_data must be a dict, but got {type(response)}, trace_id: {law_basedata.trace_id}")
+                            response_data = ResponseProto(data="response_data must be a dict",
+                                                          context_id=serialize_func.context_id,
+                                                          code=GRpcCode.INTERNAL.value).to_bytes()
+                            return self.response(base_data=law_basedata.basedata, data=response_data)
+
+                        # 6. 构造成功响应并设置缓存
+                        response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
+                                                      code=GRpcCode.OK.value).to_bytes()
+                        self.set_cache(method_name=method_name, key=serialize_func.cache_key, value=response_data)
+                        return self.response(base_data=law_basedata.basedata, data=response_data)
+
+                    except Exception as e:
+                        # 7. 异常处理
+                        # 关键优化：exc_info=True 会将完整的堆栈跟踪记录到日志中
+                        _LOGGER.error(f"{method_name} error: {e}, trace_id: {law_basedata.trace_id}", exc_info=True)
+                        response_data = ResponseProto(data=str(e), context_id=serialize_func.context_id,
+                                                      code=GRpcCode.UNAVAILABLE.value).to_bytes()
+                        return self.response(base_data=law_basedata.basedata, data=response_data)
+                    finally:
+                        et = time.perf_counter()
+                        _LOGGER.info(
+                            f"{method_name} end, end_time: {et}, cost: {et - st:.4f}s, trace_id: {law_basedata.trace_id}")
 
             # --- 装饰器工厂的执行部分 ---
             # 为一元方法创建 RpcMethodHandler，并添加到方法处理程序列表中

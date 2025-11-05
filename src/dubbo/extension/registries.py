@@ -51,7 +51,8 @@ registries = [
     "decompressorRegistry",
     "transporterRegistry",
     "configCenterRegistry",
-    "notifyFactoryRegistry"
+    "notifyFactoryRegistry",
+    "lawgenesisProtoRegisty"
 ]
 
 # RegistryFactory registry
@@ -128,11 +129,11 @@ notifyFactoryRegistry = ExtendedRegistry(
 )
 
 
-lawgenesisProto = ExtendedRegistry(
+lawgenesisProtoRegisty = ExtendedRegistry(
     interface=ProtobufInterface,
     impls={
-    "txt": "dubbo.lawgenesis_proto.txt_protobuf.TxtProtobuf",
-    "llm": "dubbo.lawgenesis_proto.llm_protobuf.LLMProtobuf",
-    "file": "dubbo.lawgenesis_proto.file_protobuf.FileProtobuf",
+    "txt": "dubbo.lawgenesis_proto.TxtProtobuf",
+    "llm": "dubbo.lawgenesis_proto.LLMProtobuf",
+    "file": "dubbo.lawgenesis_proto.FileProtobuf",
     },
 )

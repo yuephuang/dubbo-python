@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import contextvars
 import enum
 import logging
 import logging.handlers
@@ -22,6 +23,9 @@ import threading
 from dubbo.configs import LoggerConfig
 
 __all__ = ["loggerFactory"]
+
+TRACE_ID = contextvars.ContextVar('trace_id', default='N/A')
+CONTEXT_ID = contextvars.ContextVar('context_id', default='N/A')
 
 from dubbo.monitor.loki import LokiQueueHandler
 
@@ -64,7 +68,7 @@ class ColorFormatter(logging.Formatter):
         " | "
         f"%(level_color)s%(levelname)s{Colors.END.value}"
         " | "
-        f"{Colors.CYAN.value}%(module)s:%(funcName)s:%(lineno)d{Colors.END.value}"
+        f"{Colors.CYAN.value}%(trace_id)s:%(module)s:%(funcName)s:%(lineno)d{Colors.END.value}"
         " - "
         f"{Colors.PURPLE.value}[Dubbo]{Colors.END.value} "
         f"%(suffix)s"
@@ -99,6 +103,12 @@ class NoColorFormatter(logging.Formatter):
         record.message = self.suffix + record.getMessage()
         return super().format(record)
 
+class TraceIdFilter(logging.Filter):
+    """一个日志过滤器，用于从 contextvars 中获取 trace_id 并注入到日志记录中。"""
+    def filter(self, record):
+        record.trace_id = TRACE_ID.get()
+        record.tags = {"trace_id": TRACE_ID.get(), "context_id": CONTEXT_ID.get()}
+        return True
 
 class _LoggerFactory:
     """
@@ -164,6 +174,7 @@ class _LoggerFactory:
         if config.is_loki_enabled():
             logger.addHandler(cls._get_loki_handler(name))
 
+        logger.addFilter(TraceIdFilter())
         return logger
 
     @classmethod
