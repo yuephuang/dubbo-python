@@ -903,6 +903,15 @@ class LoggerConfig(AbstractConfig):
         max_bytes: int = logger_constants.DEFAULT_FILE_MAX_BYTES_VALUE
         interval: int = logger_constants.DEFAULT_FILE_INTERVAL_VALUE
 
+    class LokiConfig:
+        """
+
+        """
+        url: str = logger_constants.LOKI_URL_KEY
+        user: str = logger_constants.LOKI_USER_KEY
+        password: str = logger_constants.LOKI_PASSWORD_KEY
+        tag: dict = ast.literal_eval(logger_constants.LOKI_TAG)
+
     __slots__ = [
         "_level",
         "_global_formatter",
@@ -910,6 +919,8 @@ class LoggerConfig(AbstractConfig):
         "_console_config",
         "_file_enabled",
         "_file_config",
+        "_loki_enabled",
+        "_loki_config",
     ]
 
     def __init__(
@@ -918,6 +929,7 @@ class LoggerConfig(AbstractConfig):
             formatter: Optional[str] = None,
             console_enabled: bool = logger_constants.DEFAULT_CONSOLE_ENABLED_VALUE,
             file_enabled: bool = logger_constants.DEFAULT_FILE_ENABLED_VALUE,
+            loki_enabled: bool = logger_constants.LOKI_ENABLED_KEY
     ):
         """
         Initialize the logger configuration.
@@ -926,6 +938,7 @@ class LoggerConfig(AbstractConfig):
         :param console_enabled: Whether to enable console logger.
         :type console_enabled: bool, default is True.
         :param file_enabled: Whether to enable file logger.
+        :param loki_enabled: Whether to enable loki logger.
         """
         super().__init__()
         # logger level
@@ -941,6 +954,10 @@ class LoggerConfig(AbstractConfig):
         # file logger
         self._file_enabled = file_enabled
         self._file_config = LoggerConfig.FileConfig()
+
+        # loki logger
+        self._loki_enabled = loki_enabled
+        self._loki_config = LoggerConfig.LokiConfig()
 
     @property
     def level(self) -> str:
@@ -1043,3 +1060,39 @@ class LoggerConfig(AbstractConfig):
         :type file_config: FileConfig
         """
         self._file_config = file_config
+
+    def is_loki_enabled(self) -> bool:
+        """
+        Check if loki logger is enabled.
+        :return: True if loki logger is enabled, otherwise False.
+        :rtype: bool
+        """
+        return self._loki_enabled
+
+    def enable_loki(self) -> None:
+        """
+        Enable loki logger.
+        """
+        self._loki_enabled = True
+
+    def disable_loki(self) -> None:
+        """
+        Disable loki logger.
+        """
+        self._loki_enabled = False
+
+    def set_loki(self, loki_config: LokiConfig) -> None:
+        """
+        Set loki logger configuration.
+        :param loki_config: Loki logger configuration.
+        :type loki_config: LokiConfig
+        """
+        self._loki_config = loki_config
+
+    def get_loki_config(self) -> LokiConfig:
+        """
+        Get loki logger configuration.
+        :return: Loki logger configuration.
+        :rtype: LokiConfig
+        """
+        return self._loki_config

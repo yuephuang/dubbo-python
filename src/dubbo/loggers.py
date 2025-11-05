@@ -15,12 +15,15 @@
 # limitations under the License.
 import enum
 import logging
+import logging.handlers
 import re
 import threading
 
 from dubbo.configs import LoggerConfig
 
 __all__ = ["loggerFactory"]
+
+from dubbo.monitor.loki import LokiQueueHandler
 
 
 class ColorFormatter(logging.Formatter):
@@ -158,6 +161,9 @@ class _LoggerFactory:
         if config.is_file_enabled():
             logger.addHandler(cls._get_file_handler(name))
 
+        if config.is_loki_enabled():
+            logger.addHandler(cls._get_loki_handler(name))
+
         return logger
 
     @classmethod
@@ -206,6 +212,24 @@ class _LoggerFactory:
 
         return file_handler
 
+    @classmethod
+    def _get_loki_handler(cls, name: str) -> logging.handlers.QueueHandler:
+        """
+        Get the loki handler
+
+        :param name: The logger name.
+        :type name: str
+        :return: The loki handler.
+        :rtype: logging.handlers.QueueHandler
+        """
+        loki_uploader_handler = LokiQueueHandler(
+            upload_url=cls._config.get_loki_config().url,
+            tags=cls._config.get_loki_config().tag,
+            auth=(cls._config.get_loki_config().user, cls._config.get_loki_config().password
+                  ) if all((cls._config.get_loki_config().user, cls._config.get_loki_config().password)
+                  ) else None,
+        )
+        return loki_uploader_handler
     @classmethod
     def get_logger(cls, name=DEFAULT_LOGGER_NAME) -> logging.Logger:
         """

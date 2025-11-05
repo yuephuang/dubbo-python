@@ -81,3 +81,9 @@ DEFAULT_FILE_NAME_VALUE = os.environ.get("DEFAULT_FILE_NAME_VALUE", "dubbo.log")
 DEFAULT_FILE_MAX_BYTES_VALUE = int(os.environ.get("DEFAULT_FILE_MAX_BYTES_VALUE", 10 * 1024 * 1024))
 DEFAULT_FILE_INTERVAL_VALUE = int(os.environ.get("DEFAULT_FILE_INTERVAL_VALUE", 1))
 DEFAULT_FILE_BACKUP_COUNT_VALUE = int(os.environ.get("DEFAULT_FILE_BACKUP_COUNT_VALUE", 10))
+# Loki
+LOKI_ENABLED_KEY = os.environ.get("LOKI_ENABLED_KEY", "false").lower() == "true"
+LOKI_URL_KEY = os.environ.get("LOKI_URL_KEY", "http://127.0.0.1:3100/loki/api/v1/push")
+LOKI_USER_KEY = os.environ.get("LOKI_USER_KEY", "")
+LOKI_PASSWORD_KEY = os.environ.get("LOKI_PASSWORD_KEY", "")
+LOKI_TAG = os.environ.get("LOKI_TAG", "{}")
