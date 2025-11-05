@@ -14,13 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ENVIRONMENT = "environment"
-TEST_ENVIRONMENT = "test"
-DEVELOPMENT_ENVIRONMENT = "develop"
-PRODUCTION_ENVIRONMENT = "product"
+import os
 
-VERSION = "version"
-GROUP = "group"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "environment")
+TEST_ENVIRONMENT = os.environ.get("TEST_ENVIRONMENT", "test")
+DEVELOPMENT_ENVIRONMENT = os.environ.get("DEVELOPMENT_ENVIRONMENT", "develop")
+PRODUCTION_ENVIRONMENT = os.environ.get("PRODUCTION_ENVIRONMENT", "product")
 
-TRANSPORT = "transport"
-AIO_TRANSPORT = "aio"
+VERSION = os.environ.get("VERSION", "version")
+GROUP = os.environ.get("GROUP", "group")
+
+TRANSPORT = os.environ.get("TRANSPORT", "transport")
+AIO_TRANSPORT = os.environ.get("AIO_TRANSPORT", "aio")

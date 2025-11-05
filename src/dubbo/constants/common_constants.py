@@ -14,55 +14,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DUBBO_VALUE = "dubbo"
+import os
 
-REFER_KEY = "refer"
-EXPORT_KEY = "export"
+DUBBO_VALUE = os.environ.get("DUBBO_VALUE", "dubbo")
 
-PROTOCOL_KEY = "protocol"
-TRIPLE = "triple"
-TRIPLE_SHORT = "tri"
+REFER_KEY = os.environ.get("REFER_KEY", "refer")
+EXPORT_KEY = os.environ.get("EXPORT_KEY", "export")
 
-SIDE_KEY = "side"
-SERVER_VALUE = "server"
-CLIENT_VALUE = "client"
+PROTOCOL_KEY = os.environ.get("PROTOCOL_KEY", "protocol")
+TRIPLE = os.environ.get("TRIPLE", "triple")
+TRIPLE_SHORT = os.environ.get("TRIPLE_SHORT", "tri")
 
-METHOD_KEY = "method"
-SERVICE_KEY = "service"
+SIDE_KEY = os.environ.get("SIDE_KEY", "side")
+SERVER_VALUE = os.environ.get("SERVER_VALUE", "server")
+CLIENT_VALUE = os.environ.get("CLIENT_VALUE", "client")
 
-SERVICE_HANDLER_KEY = "service-handler"
+METHOD_KEY = os.environ.get("METHOD_KEY", "method")
+SERVICE_KEY = os.environ.get("SERVICE_KEY", "service")
 
-GROUP_KEY = "group"
+SERVICE_HANDLER_KEY = os.environ.get("SERVICE_HANDLER_KEY", "service-handler")
 
-LOCAL_HOST_KEY = "localhost"
-LOCAL_HOST_VALUE = "127.0.0.1"
-DEFAULT_PORT = 50051
+GROUP_KEY = os.environ.get("GROUP_KEY", "group")
 
-SSL_ENABLED_KEY = "ssl-enabled"
+LOCAL_HOST_KEY = os.environ.get("LOCAL_HOST_KEY", "localhost")
+LOCAL_HOST_VALUE = os.environ.get("LOCAL_HOST_VALUE", "127.0.0.1")
+DEFAULT_PORT = int(os.environ.get("DEFAULT_PORT", 50051))
 
-SERIALIZATION_KEY = "serialization"
-SERIALIZER_KEY = "serializer"
-DESERIALIZER_KEY = "deserializer"
+SSL_ENABLED_KEY = os.environ.get("SSL_ENABLED_KEY", "ssl-enabled")
 
-
-COMPRESSION_KEY = "compression"
-COMPRESSOR_KEY = "compressor"
-DECOMPRESSOR_KEY = "decompressor"
+SERIALIZATION_KEY = os.environ.get("SERIALIZATION_KEY", "serialization")
+SERIALIZER_KEY = os.environ.get("SERIALIZER_KEY", "serializer")
+DESERIALIZER_KEY = os.environ.get("DESERIALIZER_KEY", "deserializer")
 
 
-TRANSPORTER_KEY = "transporter"
-TRANSPORTER_DEFAULT_VALUE = "aio"
+COMPRESSION_KEY = os.environ.get("COMPRESSION_KEY", "compression")
+COMPRESSOR_KEY = os.environ.get("COMPRESSOR_KEY", "compressor")
+DECOMPRESSOR_KEY = os.environ.get("DECOMPRESSOR_KEY", "decompressor")
 
-TRUE_VALUE = "true"
-FALSE_VALUE = "false"
 
-RPC_TYPE_KEY = "rpc-type"
+TRANSPORTER_KEY = os.environ.get("TRANSPORTER_KEY", "transporter")
+TRANSPORTER_DEFAULT_VALUE = os.environ.get("TRANSPORTER_DEFAULT_VALUE", "aio")
 
-METHOD_DESCRIPTOR_KEY = "method-descriptor"
+TRUE_VALUE = os.environ.get("TRUE_VALUE", "true")
+FALSE_VALUE = os.environ.get("FALSE_VALUE", "false")
 
-LOADBALANCE_KEY = "loadbalance"
+RPC_TYPE_KEY = os.environ.get("RPC_TYPE_KEY", "rpc-type")
 
-PATH_SEPARATOR = "/"
-PROTOCOL_SEPARATOR = "://"
-ANY_VALUE = "*"
-COMMA_SEPARATOR = ","
+METHOD_DESCRIPTOR_KEY = os.environ.get("METHOD_DESCRIPTOR_KEY", "method-descriptor")
+
+LOADBALANCE_KEY = os.environ.get("LOADBALANCE_KEY", "loadbalance")
+
+PATH_SEPARATOR = os.environ.get("PATH_SEPARATOR", "/")
+PROTOCOL_SEPARATOR = os.environ.get("PROTOCOL_SEPARATOR", "://")
+ANY_VALUE = os.environ.get("ANY_VALUE", "*")
+COMMA_SEPARATOR = os.environ.get("COMMA_SEPARATOR", ",")
