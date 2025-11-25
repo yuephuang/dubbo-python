@@ -21,7 +21,7 @@ from typing import Union, Callable, Optional
 
 # --- 第三方库导入 ---
 import orjson
-
+import requests
 # --- 本地应用/库导入 ---
 from dubbo import Dubbo, Server
 from dubbo.cache.cache_client import CacheClient
@@ -37,6 +37,7 @@ from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID
+from dubbo.monitor.prometheus import MetricsCollector
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
 from dubbo.proxy.handlers import RpcServiceHandler
@@ -48,6 +49,8 @@ _LOGGER = loggerFactory.get_logger()
 cache_map: dict[str, CacheClient] = {}
 # 限流器映射：{method_name: LocalLimit}
 limit_map: dict[str, LocalLimit] = {}
+
+metrics_controller = MetricsCollector(system_update_interval=2)
 
 
 @contextmanager
@@ -133,12 +136,7 @@ class LawgenesisService:
                         return f"解析 '{interface}' 路由输出失败。"
 
             return f"在 '{interface}' 的路由表中未找到默认网关。"
-
-        except subprocess.CalledProcessError as e:
-            _LOGGER.warning(f"获取内网IP失败 (CalledProcessError): {e}")
-            return f"No intranet_ip found, {e} "
         except Exception as e:
-            _LOGGER.warning(f"获取内网IP失败 (Exception): {e}")
             return f"No intranet_ip found, {e}"
 
     @property
@@ -160,7 +158,6 @@ class LawgenesisService:
             return result.stdout.strip()
 
         except subprocess.CalledProcessError as e:
-            _LOGGER.warning(f"获取公网IP失败 (CalledProcessError): {e}")
             return f"No Internet IP found. {e}"
 
     def server_metadata(self) -> ServerMetaData:
@@ -168,7 +165,6 @@ class LawgenesisService:
         生成当前服务器的元数据。
         :return: ServerMetaData 对象
         """
-        # FIXME: 原代码为 "HOSTNAM"，极可能是 "HOSTNAME" 的拼写错误，已修正。
         host_name = os.environ.get("HOSTNAME", "NOT HOSTNAME")
 
         return ServerMetaData(
@@ -332,7 +328,7 @@ class LawgenesisService:
 
             # 注册缓存器
             cache_map[method_name] = CacheClient(_method_config.cache(method_name=method_name))
-
+            metrics_controller.register_metrics(method_name=method_name)
             _LOGGER.info(f"Method '{method_name}' registered with caching and rate limiting.")
             return wrapper
 
@@ -449,6 +445,15 @@ class LawgenesisService:
 
         try:
             while self.run:
+                metrics_data = metrics_controller.get_all_metrics()
+                if self.law_server_config.pushgateway_url:
+                    try:
+                        url =  f"{self.law_server_config.pushgateway_url}/metrics/job/{self.server_metadata().server_name}/instance/{self.server_metadata().host_name}"
+                        resp = requests.post(url, data=metrics_data)
+                        resp.raise_for_status()
+                    except Exception as e:
+                        _LOGGER.error(f"推送到 Pushgateway 失败: {e}")
+                        continue
                 await asyncio.sleep(1)
         except (KeyboardInterrupt, asyncio.CancelledError):
             _LOGGER.info("服务器关闭信号已接收...")

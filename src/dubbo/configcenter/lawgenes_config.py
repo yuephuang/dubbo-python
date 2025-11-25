@@ -159,7 +159,6 @@ class ConfigReloader:
             # 订阅失败不应阻塞应用启动
             _LOGGER.error(f"Failed to subscribe to Nacos config: {config_name}/{group}. Error: {e}")
 
-
 class LawServerConfig(ConfigReloader):
     """
     服务配置类
@@ -175,6 +174,7 @@ class LawServerConfig(ConfigReloader):
         self.server_group = None
         self.env = None
         self.register_center_url = None
+        self.pushgateway_url = None
         self.config_name = "server"
 
     @staticmethod

@@ -54,7 +54,6 @@ classifiers=[
 
 dependencies = [
     "h2>=4.1.0",
-    "uvloop>=0.19.0; platform_system!='Windows'",
     "psutil>=6.0.0",
     "nacos-sdk-python>=2.0.6",
     "kazoo>=2.10.0",
@@ -63,6 +62,7 @@ dependencies = [
     "pympler>=1.1",
     "throttled-py[all]>=2.2.3",
     "blinker>=1.9.0",
+    "loguru>=0.7.3",
 ]
 dynamic = ["version", "readme"]
 

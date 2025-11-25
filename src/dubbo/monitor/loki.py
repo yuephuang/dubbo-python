@@ -12,6 +12,12 @@ import functools
 import string
 from typing import Any, Dict, Optional, Tuple, List
 
+try:
+    from loguru import logger, Record
+except ImportError:
+    logger = None
+    Record = None
+
 
 
 # --- 配置 (Config) ---
@@ -74,26 +80,50 @@ class LokiEmitter(abc.ABC):
                     tags[cleared_name] = str(tag_value)
         return tags
 
-    def build_payload(self, records: list[logging.LogRecord]) -> dict:
+    def build_tags_from_loguru(self, record: "Record") -> Dict[str, Any]:
+        """从 loguru 记录构建标签"""
+        tags = copy.deepcopy(self.tags)
+        tags[LokiConfig.LEVEL_TAG] = record["level"].name.lower()
+        tags[LokiConfig.LOGGER_TAG] = record["name"]
+
+        # 从 extra 中获取额外标签
+        extra_tags = record.get("extra", {})
+        if isinstance(extra_tags, dict):
+            for tag_name, tag_value in extra_tags.items():
+                cleared_name = self.format_label(tag_name)
+                if cleared_name:
+                    # 确保标签值为字符串
+                    tags[cleared_name] = str(tag_value)
+        return tags
+
+    def build_payload(self, records: list) -> dict:
         """为日志条目构建 JSON 有效负载，按标签分组为 streams。"""
         streams = {}
         ns = 1e9  # 纳秒转换
 
-        # 实例化一个简单的 Formatter，用于获取消息行
-        formatter = logging.Formatter('%(message)s')
-
         for record in records:
-            labels_dict = self.build_tags(record)
-            labels_key = tuple(sorted(labels_dict.items()))
-            line = formatter.format(record)  # 格式化消息
-            ts = str(int(record.created * ns))
+            # 处理不同的日志记录类型
+            if isinstance(record, logging.LogRecord):
+                # 标准 logging 记录
+                labels_dict = self.build_tags(record)
+                message = record.getMessage()
+                timestamp = str(int(record.created * ns))
+            elif isinstance(record, dict) and logger is not None:
+                # Loguru 记录
+                labels_dict = self.build_tags_from_loguru(record)
+                message = record["message"]
+                timestamp = str(int(record["time"].timestamp() * ns))
+            else:
+                continue
 
+            labels_key = tuple(sorted(labels_dict.items()))
+            
             if labels_key not in streams:
                 streams[labels_key] = {
                     "stream": labels_dict,
                     "values": []
                 }
-            streams[labels_key]["values"].append([ts, line])
+            streams[labels_key]["values"].append([timestamp, message])
 
         return {"streams": list(streams.values())}
 
@@ -199,14 +229,6 @@ class LogUploaderThread(threading.Thread, LokiEmitter):
         self.close()  # 关闭 HTTP Session
         print("LokiUploaderThread: 线程已退出。")
 
-    def stop(self):
-        """设置停止事件，并等待线程退出。"""
-        self._stop_event.set()
-        # 等待线程安全地完成退出
-        self.join(timeout=15)
-        if self.is_alive():
-            print("[警告] Loki 上传线程在等待 15 秒后未能优雅退出。", file=sys.stderr)
-
 
 # --- LokiQueueHandler (新的入口，隐藏队列) ---
 class LokiQueueHandler(logging.handlers.QueueHandler):
@@ -247,6 +269,20 @@ class LokiQueueHandler(logging.handlers.QueueHandler):
                 break
 
         print("LokiQueueHandler: 已安全停止日志上传服务。")
+
+    def write(self, message):
+        """
+        使 LokiQueueHandler 可以作为 loguru 的 sink
+        """
+        # 创建一个简单的记录对象来传递给队列
+        record = {
+            "message": message,
+            "level": {"name": "INFO"},
+            "name": "loguru",
+            "time": time.time(),
+            "extra": {}
+        }
+        self.queue.put(record)
 
 
 # --- 日志配置 ---

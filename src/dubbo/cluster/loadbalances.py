@@ -163,7 +163,7 @@ class ConsistentHashLoadBalance(AbstractLoadBalance):
         # 对所有虚拟节点的哈希值进行排序，只在重建时执行一次
         self._sorted_hashes = sorted(self._hash_ring.keys())
         self._cached_invokers = set(invoker.get_url().to_str() for invoker in invokers)
-        _LOGGER.info = (f"哈希环已重建，包含 {len(self._sorted_hashes)} 个虚拟节点。")
+        _LOGGER.info = f"哈希环已重建，包含 {len(self._sorted_hashes)} 个虚拟节点。"
 
     def check_invoker(self, invokers: list[Invoker]):
         """

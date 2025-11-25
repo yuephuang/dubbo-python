@@ -15,11 +15,10 @@
 # limitations under the License.
 import contextvars
 import enum
-import logging
-import logging.handlers
 import re
 import threading
-
+from typing import Optional
+from loguru import logger
 from dubbo.configs import LoggerConfig
 
 __all__ = ["loggerFactory"]
@@ -30,7 +29,7 @@ CONTEXT_ID = contextvars.ContextVar('context_id', default='N/A')
 from dubbo.monitor.loki import LokiQueueHandler
 
 
-class ColorFormatter(logging.Formatter):
+class ColorFormatter:
     """
     A formatter with color.
     It will format the log message like this:
@@ -64,29 +63,22 @@ class ColorFormatter(logging.Formatter):
     DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
     LOG_FORMAT: str = (
-        f"{Colors.GREEN.value}%(asctime)s{Colors.END.value}"
+        f"{Colors.GREEN.value}{{time:YYYY-MM-DD HH:mm:ss}}{Colors.END.value}"
         " | "
-        f"%(level_color)s%(levelname)s{Colors.END.value}"
+        "{{level_color}}{{level: <7}}{{end_color}}"
         " | "
-        f"{Colors.CYAN.value}%(trace_id)s:%(module)s:%(funcName)s:%(lineno)d{Colors.END.value}"
+        f"{Colors.CYAN.value}{{extra[trace_id]}}:{{name}}:{{function}}:{{line}}{Colors.END.value}"
         " - "
         f"{Colors.PURPLE.value}[Dubbo]{Colors.END.value} "
-        f"%(suffix)s"
-        f"%(msg_color)s%(message)s{Colors.END.value}"
+        "{{suffix}}"
+        "{{message_color}}{{message}}{{end_color}}"
     )
 
     def __init__(self, suffix: str = ""):
-        super().__init__(self.LOG_FORMAT, self.DATE_FORMAT)
         self.suffix = f"{self.Colors.PURPLE.value}[{suffix}]{self.Colors.END.value} " if suffix else ""
 
-    def format(self, record) -> str:
-        levelname = record.levelname
-        record.level_color = record.msg_color = self.COLOR_LEVEL_MAP.get(levelname)
-        record.suffix = self.suffix
-        return super().format(record)
 
-
-class NoColorFormatter(logging.Formatter):
+class NoColorFormatter:
     """
     A formatter without color.
     It will format the log message like this:
@@ -94,21 +86,34 @@ class NoColorFormatter(logging.Formatter):
     """
 
     def __init__(self, suffix: str = ""):
-        color_re = re.compile(r"\033\[[0-9;]*\w|%\((msg_color|level_color)\)s")
+        color_re = re.compile(r"\033\[[0-9;]*\w")
         self.log_format = color_re.sub("", ColorFormatter.LOG_FORMAT)
         self.suffix = f"[{suffix}] " if suffix else ""
-        super().__init__(self.log_format, ColorFormatter.DATE_FORMAT)
 
-    def format(self, record) -> str:
-        record.message = self.suffix + record.getMessage()
-        return super().format(record)
 
-class TraceIdFilter(logging.Filter):
-    """一个日志过滤器，用于从 contextvars 中获取 trace_id 并注入到日志记录中。"""
-    def filter(self, record):
-        record.trace_id = TRACE_ID.get()
-        record.tags = {"trace_id": TRACE_ID.get(), "context_id": CONTEXT_ID.get()}
-        return True
+def format_record(record):
+    """
+    Custom format function for loguru
+    """
+    # Get trace_id from context vars
+    record["extra"]["trace_id"] = TRACE_ID.get()
+    
+    # Apply coloring based on level
+    level_name = record["level"].name
+    colors = ColorFormatter.COLOR_LEVEL_MAP
+    record["level_color"] = colors.get(level_name, "")
+    record["message_color"] = colors.get(level_name, "")
+    record["end_color"] = ColorFormatter.Colors.END.value
+    
+    # Handle suffix
+    formatter = record["extra"].get("_formatter")
+    if formatter:
+        record["suffix"] = formatter.suffix
+    else:
+        record["suffix"] = ""
+        
+    return record
+
 
 class _LoggerFactory:
     """
@@ -120,6 +125,8 @@ class _LoggerFactory:
     _logger_lock = threading.RLock()
     _config: LoggerConfig = LoggerConfig()
     _loggers = {}
+    _configured = False
+    _logger_id = None
 
     @classmethod
     def set_config(cls, config):
@@ -133,136 +140,153 @@ class _LoggerFactory:
     def _refresh_config(cls) -> None:
         """
         Refresh the logger configuration.
-
         """
         with cls._logger_lock:
-            # create logger if not exists
-            if not cls._loggers:
-                cls._loggers[cls.DEFAULT_LOGGER_NAME] = logging.getLogger(cls.DEFAULT_LOGGER_NAME)
+            # Remove all handlers if already configured
+            if cls._logger_id is not None:
+                logger.remove(cls._logger_id)
+            
+            config = cls._config
 
-            # update all loggers
-            for name, logger in cls._loggers.items():
-                cls._update_logger(logger, name)
+            # Add console handler if enabled
+            if config.is_console_enabled():
+                cls._add_console_handler()
+
+            # Add file handler if enabled
+            if config.is_file_enabled():
+                cls._add_file_handler()
+
+            # Add loki handler if enabled
+            if config.is_loki_enabled():
+                cls._add_loki_handler()
+
+            cls._configured = True
 
     @classmethod
-    def _update_logger(cls, logger: logging.Logger, name: str) -> logging.Logger:
+    def _add_console_handler(cls) -> None:
         """
-        Update the logger with the current configuration.
-        :param logger: The logger to update.
-        :type logger: logging.Logger
-        :param name: The logger name.
-        :type name: str
-        :return: The updated logger.
-        :rtype: logging.Logger
+        Add the console handler
         """
-        # clean up handlers
-        logger.handlers.clear()
-
         config = cls._config
-
-        # set logger level
-        logger.setLevel(config.level)
-
-        # add console handler if enabled
-        if config.is_console_enabled():
-            logger.addHandler(cls._get_console_handler(name))
-
-        # add file handler if enabled
-        if config.is_file_enabled():
-            logger.addHandler(cls._get_file_handler(name))
-
-        if config.is_loki_enabled():
-            logger.addHandler(cls._get_loki_handler(name))
-
-        logger.addFilter(TraceIdFilter())
-        return logger
-
-    @classmethod
-    def _get_console_handler(cls, name: str) -> logging.StreamHandler:
-        """
-        Get the console handler
-
-        :param name: The logger name.
-        :type name: str
-        :return: The console handler.
-        :rtype: logging.StreamHandler
-        """
-        console_handler = logging.StreamHandler()
-        if not cls._config.console_config.formatter or cls._config.global_formatter:
-            # set default color formatter
-            console_handler.setFormatter(ColorFormatter(name if name != cls.DEFAULT_LOGGER_NAME else ""))
-        else:
-            console_handler.setFormatter(
-                logging.Formatter(cls._config.console_config.formatter or cls._config.global_formatter)
-            )
-
-        return console_handler
-
-    @classmethod
-    def _get_file_handler(cls, name: str) -> logging.FileHandler:
-        """
-        Get the file handler
-
-        :param name: The logger name.
-        :type name: str
-        :return: The file handler.
-        :rtype: logging.FileHandler
-        """
-        file_handler = logging.FileHandler(
-            filename=cls._config.file_config.file_name,
-            mode="a",
-            encoding="utf-8",
+        
+        # Create formatter
+        formatter = ColorFormatter(cls.DEFAULT_LOGGER_NAME)
+        
+        # Add handler with custom format function
+        cls._logger_id = logger.add(
+            sink=lambda msg: print(msg, end=""),
+            format=format_record,
+            level=config.level,
+            filter=lambda record: record["extra"].update({"_formatter": formatter}) or True
         )
-        if not cls._config.file_config.file_formatter or cls._config.global_formatter:
-            # set default no color formatter
-            file_handler.setFormatter(NoColorFormatter(name if name != cls.DEFAULT_LOGGER_NAME else ""))
-        else:
-            file_handler.setFormatter(
-                logging.Formatter(cls._config.file_config.file_formatter or cls._config.global_formatter)
-            )
-
-        return file_handler
 
     @classmethod
-    def _get_loki_handler(cls, name: str) -> logging.handlers.QueueHandler:
+    def _add_file_handler(cls) -> None:
         """
-        Get the loki handler
+        Add the file handler
+        """
+        config = cls._config
+        
+        # Create no-color formatter
+        formatter = NoColorFormatter(cls.DEFAULT_LOGGER_NAME)
+        
+        # Add handler with custom format function
+        logger.add(
+            sink=config.file_config.file_name,
+            format=format_record,
+            level=config.level,
+            filter=lambda record: record["extra"].update({"_formatter": formatter}) or True,
+            encoding="utf-8"
+        )
 
-        :param name: The logger name.
-        :type name: str
-        :return: The loki handler.
-        :rtype: logging.handlers.QueueHandler
+    @classmethod
+    def _add_loki_handler(cls) -> None:
         """
+        Add the loki handler
+        """
+        config = cls._config
+        
         loki_uploader_handler = LokiQueueHandler(
-            upload_url=cls._config.get_loki_config().url,
-            tags=cls._config.get_loki_config().tag,
-            auth=(cls._config.get_loki_config().user, cls._config.get_loki_config().password
-                  ) if all((cls._config.get_loki_config().user, cls._config.get_loki_config().password)
-                  ) else None,
+            upload_url=config.get_loki_config().url,
+            tags=config.get_loki_config().tag,
+            auth=(config.get_loki_config().user, config.get_loki_config().password)
+                  if all((config.get_loki_config().user, config.get_loki_config().password))
+                  else None,
         )
-        return loki_uploader_handler
+        
+        # Add handler for Loki
+        logger.add(
+            sink=loki_uploader_handler,
+            format="{time} | {level: <8} | {name}:{function}:{line} - {message}",
+            level=config.level
+        )
+
     @classmethod
-    def get_logger(cls, name=DEFAULT_LOGGER_NAME) -> logging.Logger:
+    def get_logger(cls, name=DEFAULT_LOGGER_NAME) -> "LoggerAdapter":
         """
         Get the logger. class method.
 
-        :return: The logger.
-        :rtype: logging.Logger
+        :return: The logger adapter.
+        :rtype: LoggerAdapter
         """
-        logger = cls._loggers.get(name)
-        if logger is not None:
-            return logger
+        logger_adapter = cls._loggers.get(name)
+        if logger_adapter is not None:
+            return logger_adapter
 
         with cls._logger_lock:
-            logger = cls._loggers.get(name)
+            logger_adapter = cls._loggers.get(name)
             # double check
-            if logger is not None:
-                return logger
+            if logger_adapter is not None:
+                return logger_adapter
 
-            logger = cls._update_logger(logging.getLogger(name), name)
-            cls._loggers[name] = logger
+            logger_adapter = LoggerAdapter(name)
+            cls._loggers[name] = logger_adapter
 
-        return logger
+        return logger_adapter
+
+
+class LoggerAdapter:
+    """
+    Adapter to make loguru logger compatible with the previous logging.Logger interface
+    """
+    
+    def __init__(self, name: str):
+        self.name = name
+        self._logger = logger.bind(name=name)
+
+    def _log(self, level: str, msg, *args, **kwargs):
+        # Handle args formatting
+        if args:
+            msg = msg % args
+            
+        # Add trace_id to log context
+        trace_id = TRACE_ID.get()
+        context_id = CONTEXT_ID.get()
+        
+        # Bind extra context
+        log = self._logger.bind(trace_id=trace_id)
+        
+        # Log with appropriate level
+        log.log(level.upper(), msg)
+            
+    def debug(self, msg, *args, **kwargs):
+        self._log("DEBUG", msg, *args, **kwargs)
+        
+    def info(self, msg, *args, **kwargs):
+        self._log("INFO", msg, *args, **kwargs)
+        
+    def warning(self, msg, *args, **kwargs):
+        self._log("WARNING", msg, *args, **kwargs)
+        
+    def error(self, msg, *args, **kwargs):
+        self._log("ERROR", msg, *args, **kwargs)
+        
+    def critical(self, msg, *args, **kwargs):
+        self._log("CRITICAL", msg, *args, **kwargs)
+        
+    def setLevel(self, level):
+        # Loguru handles levels differently, this is just for compatibility
+        pass
 
 
 # expose loggerFactory
