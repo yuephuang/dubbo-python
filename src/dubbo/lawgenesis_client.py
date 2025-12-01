@@ -1,3 +1,5 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict
 
 from dubbo import Dubbo
@@ -7,12 +9,14 @@ from dubbo.configs import ReferenceConfig, RegistryConfig
 from dubbo.lawgenesis_proto import lawgenesis_pb2, ProtobufInterface, LawMetaData
 from dubbo.url import create_url
 
+DEFAULT_MAX_WORKERS = 1000
 
 class _InvokeClient:
     def __init__(self, server_name, client_config: LawClientConfig, service_url: str= None):
         self.client_config = client_config or LawClientConfig()
         self.server_name = server_name
         self.service_url = service_url
+        self._executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
 
     @staticmethod
     def get_authorization() -> lawgenesis_pb2.Auth:
@@ -42,25 +46,28 @@ class _InvokeClient:
         client = DubboClient(reference=ReferenceConfig.from_url(url=url))
         return client
 
-
-    async def async_invoke(self, method_name: str, request_data :"ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
-        metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
-        metadata.data_type = request_data.protobuf_type
-        # metadata.is_cache = True
-        metadata.auth = self.get_authorization()
-        law_request = lawgenesis_pb2.LawgenesisRequest(
-            DATA=request_data.param2bytes,
-            BADA=metadata.basedata
-        )
-        # 获取异步调用函数
-        async_unary_call = self.client.unary(
-            method_name=method_name,
-            request_serializer=lawgenesis_pb2.LawgenesisRequest.SerializeToString,
-            response_deserializer=lawgenesis_pb2.LawgenesisReply.FromString,
-        )
-        
-        # 执行异步调用并返回结果
-        return await async_unary_call(law_request)
+    async def async_invoke(self, method_name: str, request_data: "ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
+        """
+        使用线程池 (asyncio.to_thread) 运行同步的 self.invoke 方法，
+        实现调用侧的异步效果。
+        """
+        """
+                通过线程池异步执行同步的 RPC 调用。
+                """
+        loop = asyncio.get_event_loop()
+        try:
+            # 在线程池中执行同步的 _sync_unary_call 方法
+            result = await loop.run_in_executor(
+                self._executor,
+                # 注意：这里需要传递方法名和请求数据作为参数
+                self.invoke,
+                method_name,
+                request_data
+            )
+            return result
+        except Exception as e:
+            # logger.error(f"底层Dubbo调用发生错误: {e}") # 假设 logger 存在
+            raise e
 
     def invoke(self, method_name: str, request_data :"ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
         metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())

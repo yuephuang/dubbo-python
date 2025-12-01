@@ -315,7 +315,7 @@ class LawgenesisService:
                     finally:
                         et = time.perf_counter()
                         _LOGGER.info(
-                            f"{method_name} end, end_time: {et}, cost: {et - st:.4f}s, trace_id: {law_basedata.trace_id}")
+                            f"{method_name} end, end_time: {et}, cost: {(et - st)*1000:.4f}ms, trace_id: {law_basedata.trace_id}")
 
             # --- 装饰器工厂的执行部分 ---
             # 为一元方法创建 RpcMethodHandler，并添加到方法处理程序列表中
