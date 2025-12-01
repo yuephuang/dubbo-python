@@ -23,39 +23,6 @@ from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 
-
-def _try_use_uvloop() -> None:
-    """
-    Use uvloop instead of the default asyncio running_loop.
-    """
-    import asyncio
-    import os
-
-    # Check if the operating system.
-    if os.name == "nt":
-        # Windows is not supported.
-        _LOGGER.warning("Unable to use uvloop, because it is not supported on your operating system.")
-        return
-
-    # Try import uvloop.
-    try:
-        import uvloop
-    except ImportError:
-        # uvloop is not available.
-        _LOGGER.warning(
-            "Unable to use uvloop, because it is not installed. You can install it by running `pip install uvloop`."
-        )
-        return
-
-    # Use uvloop instead of the default asyncio running_loop.
-    if not isinstance(asyncio.get_event_loop_policy(), uvloop.EventLoopPolicy):
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-
-# Call the function to try to use uvloop.
-_try_use_uvloop()
-
-
 class EventLoop:
     def __init__(self, in_other_tread: bool = True):
         self._in_other_tread = in_other_tread

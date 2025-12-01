@@ -44,7 +44,23 @@ class _InvokeClient:
 
 
     async def async_invoke(self, method_name: str, request_data :"ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
-        pass
+        metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
+        metadata.data_type = request_data.protobuf_type
+        # metadata.is_cache = True
+        metadata.auth = self.get_authorization()
+        law_request = lawgenesis_pb2.LawgenesisRequest(
+            DATA=request_data.param2bytes,
+            BADA=metadata.basedata
+        )
+        # 获取异步调用函数
+        async_unary_call = self.client.unary(
+            method_name=method_name,
+            request_serializer=lawgenesis_pb2.LawgenesisRequest.SerializeToString,
+            response_deserializer=lawgenesis_pb2.LawgenesisReply.FromString,
+        )
+        
+        # 执行异步调用并返回结果
+        return await async_unary_call(law_request)
 
     def invoke(self, method_name: str, request_data :"ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
         metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
