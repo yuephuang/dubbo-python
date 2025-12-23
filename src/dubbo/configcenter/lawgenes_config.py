@@ -4,7 +4,7 @@ from typing import Union, Dict, Any
 
 from blinker import signal
 
-from dubbo.configcenter import NacosConfigCenter, LocalConfigCenter, Config
+from dubbo.configcenter import NacosConfigCenter, Config
 from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
@@ -63,11 +63,7 @@ class ConfigReloader:
         确保在整个应用生命周期内只创建一个客户端实例。
         """
         if cls._client_instance is None:
-            # 根据环境变量创建客户端实例
-            if os.environ.get("config_type", "local") == "local":
-                cls._client_instance = LocalConfigCenter(url=os.environ.get("CONFIG_URL"))
-            else:
-                cls._client_instance = NacosConfigCenter(url=os.environ.get("CONFIG_URL"))
+            cls._client_instance = NacosConfigCenter(url=os.environ.get("CONFIG_URL"))
         return cls._client_instance
 
     @staticmethod

@@ -56,7 +56,6 @@ dependencies = [
     "h2>=4.1.0",
     "psutil>=6.0.0",
     "nacos-sdk-python>=2.0.6",
-    "kazoo>=2.10.0",
     "orjson>=3.11.4",
     "cachetools>=6.2.1",
     "pympler>=1.1",
@@ -74,9 +73,7 @@ Repository = "https://github.com/apache/dubbo-python"
 Issues = "https://github.com/apache/dubbo/issues"
 
 [project.optional-dependencies]
-zookeeper = [
-    "kazoo>=2.10.0",
-]
+
 nacos = [
     "nacos-sdk-python>=2.0.6",
 ]

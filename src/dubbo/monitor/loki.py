@@ -12,11 +12,8 @@ import functools
 import string
 from typing import Any, Dict, Optional, Tuple, List
 
-try:
-    from loguru import logger, Record
-except ImportError:
-    logger = None
-    Record = None
+from loguru import logger, Record
+
 
 
 

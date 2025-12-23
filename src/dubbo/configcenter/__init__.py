@@ -14,10 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._interfaces import Config
 from .nacos import NacosConfigCenter
-from .local import LocalConfigCenter
 
 __all__ = [
-    "NacosConfigCenter", "LocalConfigCenter"
+    "NacosConfigCenter"
 ]
