@@ -38,6 +38,7 @@ class LawMetaData:
         """
         if not isinstance(basedata, lawgenesis_pb2.BaseData):
             raise TypeError("basedata must be an instance of lawgenesis_pb2.BaseData")
+        print(basedata)
         self._baseData = basedata
         self.validate()
 
@@ -55,6 +56,11 @@ class LawMetaData:
     @property
     def basedata(self) -> lawgenesis_pb2.BaseData:
         """Returns the raw lawgenesis_pb2.BaseData object."""
+        self._baseData.VER = self.version or "1.0"
+        self._baseData.CBUR = self.callback_url or ""
+        self._baseData.SLA = self.sla_level or 0
+        self._baseData.DTYP = self.data_type or "json"
+
         return self._baseData
 
     @property

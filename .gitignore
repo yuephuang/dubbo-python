@@ -69,3 +69,5 @@ tests/
 /samples/
 /docs/
 /dist/
+
+.DS_Store
