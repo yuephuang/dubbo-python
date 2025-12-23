@@ -1,10 +1,9 @@
 import ast
-import os
+import asyncio
 from typing import Union, Dict, Any
 
-from blinker import signal
-
 from dubbo.configcenter import NacosConfigCenter, Config
+from dubbo.constants.nacos_constants import NACOS_GROUP, NACOS_URL
 from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
@@ -18,43 +17,12 @@ class ConfigReloader:
     """
 
     # 实现客户端单例缓存
-    _client_instance: "Config" = None
+    _client_instance: Config = None
+    config_name = ""
+    group = NACOS_GROUP
+
     def __init__(self):
-        """Initializes a ConfigReloader instance.
-        """
-        # 注意：此处的 _cache_config 是一个静态变量，用于缓存配置。
-        # 初始化获取配置
-        self._group = "config"
-        self._config_name = ""
-        self._cache_config = {}
-
-    @property
-    def config_name(self) -> str:
-        """
-        获取 Nacos 的 Data ID。
-        """
-        return self._config_name
-
-    @config_name.setter
-    def config_name(self, value: str):
-        """
-        设置 Nacos 的 Data ID。
-        """
-        self._config_name = value
-
-    @property
-    def config_group(self) -> str:
-        """
-        获取 Nacos 的 Group。
-        """
-        return self._group
-
-    @config_group.setter
-    def config_group(self, value: str):
-        """
-        设置 Nacos 的 Group。
-        """
-        self._group = value
+        pass
 
     @classmethod
     def client(cls) -> "Config":
@@ -63,12 +31,13 @@ class ConfigReloader:
         确保在整个应用生命周期内只创建一个客户端实例。
         """
         if cls._client_instance is None:
-            cls._client_instance = NacosConfigCenter(url=os.environ.get("CONFIG_URL"))
+            cls._client_instance = NacosConfigCenter(url=NACOS_URL)
         return cls._client_instance
 
     @staticmethod
     def single_send():
         _LOGGER.info("Send single config")
+
 
     async def reload(self, tenant, data_id, group, content):
         """
@@ -76,51 +45,41 @@ class ConfigReloader:
         订阅的格式一定是个字典。
         """
         try:
-            _LOGGER.info(f"Reload config from nacos: {tenant}/{data_id}/{group}")
-            # 使用 ast.literal_eval 安全地将字符串转换为 Python 对象 (通常是字典)
-            # 注意: 如果配置内容非常大，ast.literal_eval 可能会消耗一定 CPU，但通常不是高负载的主要原因。
-            if not isinstance(content, dict):
-                data_json = ast.literal_eval(content)
-            else:
-                data_json = content
-
-            if not isinstance(data_json, dict):
-                _LOGGER.error(f"Reload config: Content is not a dictionary, failed. Content: {content}")
-                return
-
-            _LOGGER.info(f"Reload config: {data_json}, success")
-            self.single_send()
+            message = f"Reload config from nacos: {tenant}/{data_id}/{group}"
+            _LOGGER.info(message)
         except Exception as e:
             _LOGGER.error(f"Reload config: {content}, failed: {e}")
             return
 
         # 更新缓存
-        self._cache_config = data_json
-        self.update_cls()
+        self.update_cls(content)
+        self.single_send()
 
-    def update_cls(self):
+
+    @classmethod
+    def update_cls(cls, content):
         # 遍历配置字典，更新类实例属性
-        for key, value in self._cache_config.items():
-            # 仅更新 __init__ 中已声明的属性，避免动态添加未预期的属性
-            if key not in self.__dict__:
-                _LOGGER.warning(
-                    f"Config field '{self.__class__.__name__}.{key}' not defined in __init__, skipping update.")
-                continue
+        if cls.config_name.endswith(".json"):
+            # 处理 JSON 格式的配置
+            content = ast.literal_eval(content)
+            for key, value in content.items():
+                setattr(cls, key, value)
 
-            try:
-                # 假设这里可以直接设置属性，不需要 set_config 方法
-                setattr(self, key, value)
-                _LOGGER.info(f"Updated config: {self.__class__.__name__}.{key} = {value}")
-            except Exception as e:
-                # 捕获其他设置属性时可能发生的错误
-                _LOGGER.error(f"Error setting config for {self.__class__.__name__}.{key}: {e}")
+
+
+    async def start_reloader(self):
+        """
+        启动配置重载器。
+        """
+        content = await self.client().async_get_config(config_name=self.config_name, group=self.group)
+        self.update_cls(content)
 
     async def async_start_reloader(self):
         """
         异步启动配置重载器：获取初始配置并设置非阻塞的订阅监听。
         """
         config_name = self.config_name
-        group = self.config_group
+        group = self.group
         client = self.client()  # 现在获取的是单例实例
 
         _LOGGER.info(f"Starting initial config fetch for: {config_name}/{group}")
@@ -130,16 +89,7 @@ class ConfigReloader:
             config_name=config_name,
             group=group
         )
-
-        # 检查并处理数据格式
-        if not isinstance(data, dict):
-            try:
-                data = ast.literal_eval(data)
-            except Exception as e:
-                _LOGGER.error(f"Initial config fetch failed to parse content: {data}. Error: {e}")
-                return
-        self._cache_config = data
-        self.update_cls()
+        self.update_cls(data)
         _LOGGER.info(f"Initial config loaded successfully: {config_name}/{group}")
 
         # 2. 定义配置变更监听器 (非阻塞订阅)
@@ -155,47 +105,35 @@ class ConfigReloader:
             # 订阅失败不应阻塞应用启动
             _LOGGER.error(f"Failed to subscribe to Nacos config: {config_name}/{group}. Error: {e}")
 
+
+
 class LawServerConfig(ConfigReloader):
     """
     服务配置类
     """
-    def __init__(self):
-        """Initializes a ServerConfig instance.
-        """
-        super().__init__()
-        self.name = None
-        self.version = None
-        self.host = None
-        self.port = None
-        self.server_group = None
-        self.env = None
-        self.register_center_url = None
-        self.pushgateway_url = None
-        self.config_name = "server"
-
-    @staticmethod
-    def single_send():
-        return server_single.send()
+    config_name = f"{NACOS_GROUP}_server.json"
+    name = None
+    version = None
+    host = None
+    port = None
+    server_group = None
+    env = None
+    register_center_url = None
+    pushgateway_url = None
 
 class LawClientConfig(ConfigReloader):
     """
     客户端配置类
     """
-    def __init__(self):
-        """Initializes a ClientConfig instance.
-        """
-        super().__init__()
-        self.name = None
-        self.version = None
-        self.client_group = None
-        self.env = None
-        self.load_balance = None
-        self.server_url = None
-        self.register_center_url = None
-        self.config_name = "client"
-    @staticmethod
-    def single_send():
-        return client_single.send()
+    config_name = f"{NACOS_GROUP}_client.json"
+    name = None
+    version = None
+    client_group = None
+    env = None
+    load_balance = None
+    server_url = None
+    register_center_url = None
+
 
 class MethodCacheConfig:
     """
@@ -216,15 +154,6 @@ class MethodCacheConfig:
         self.cache_ttl = cache_ttl
         self.cache_memory_size = cache_memory_size
 
-    def hash_code(self):
-        """
-        计算缓存配置的哈希值。
-
-        Returns:
-            int: The hash value of the cache configuration.
-        """
-        return hash((self.cache_enable, self.cache_num, self.cache_ttl, self.cache_memory_size))
-
 class MethodRetryConfig:
     """
     方法重试配置类
@@ -242,14 +171,6 @@ class MethodRetryConfig:
         self.retry_num = retry_num
         self.retry_interval = retry_interval
 
-    def hash_code(self):
-        """
-        计算重试配置的哈希值。
-
-        Returns:
-            int: The hash value of the retry configuration.
-        """
-        return hash((self.retry_enable, self.retry_num, self.retry_interval))
 
 class RateLimitKeyConfig:
     """
@@ -322,20 +243,10 @@ class LawMethodConfig(ConfigReloader):
     """
     方法配置类
     """
-    def __init__(self):
-        """Initializes a MethodConfig instance.
-        """
-        super().__init__()
-        self.method_name_map = {}
-        self.config_name = "method"
-        self.protobuf_type = "txt"
-        self._cache = None
-        self._rate = None
-        self._rate_limit = None
-
-    @staticmethod
-    def single_send():
-        return method_single.send()
+    config_name = f"{NACOS_GROUP}_method.json"
+    _cache_config: Dict[str, Dict[str, Any]] = {}
+    _rate_config: Dict[str, Dict[str, Any]] = {}
+    _retry_config: Dict[str, Dict[str, Any]] = {}
 
     def cache(self, method_name) -> MethodCacheConfig:
         cache_item = self._cache_config.get(method_name, {}).get("cache", {})
@@ -372,18 +283,10 @@ class NotifyConfig(ConfigReloader):
     def __init__(self):
         """
         Initialize the notify configuration.
-        :param url: The notify url.
-        :type notify_type: str
         """
         super().__init__()
         self.config_name = "notify"
         self.url = ""
-
-# todo， 后续用single 来通知配置变化
-
-server_single = signal("server")
-client_single = signal("client")
-method_single = signal("method")
 
 
 

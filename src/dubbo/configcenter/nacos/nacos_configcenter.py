@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+from typing import Union
 
 # 移除旧的 nacos 客户端，并导入 v2 版本配置服务所需的类
 from v2.nacos import NacosConfigService, ClientConfigBuilder, GRPCConfig, ConfigParam
 
 from dubbo.configcenter._interfaces import Config
 from dubbo.constants import registry_constants
-from dubbo.url import URL, create_url
+from dubbo.url import create_url, URL
 
 __all__ = ["NacosConfigCenter"]
 
@@ -29,12 +30,17 @@ class NacosConfigCenter(Config):
     Nacos 配置中心实现，使用 v2.nacos.NacosConfigService
     """
 
-    def __init__(self, url: str):
-        url = create_url(url)
+    def __init__(self, url: Union[str, URL]):
+        if isinstance(url, str):
+            url = create_url(url)
         self.url = url
-        # nacos_client 实际上是 NacosConfigService 实例
         self.nacos_client = None
-        asyncio.run(self._init_nacos_client())
+        self._init_task = None
+        try:
+            self._init_task = asyncio.create_task(self._init_nacos_client())
+        except RuntimeError:
+            # 如果没有运行中的事件循环，则运行它
+            asyncio.run(self._init_nacos_client())
 
     async def _init_nacos_client(self) -> NacosConfigService:
         """
@@ -72,6 +78,8 @@ class NacosConfigCenter(Config):
         """
         异步获取配置内容
         """
+        if self._init_task:
+            await self._init_task
         content = await self.nacos_client.get_config(ConfigParam(
             data_id=config_name,
             group=group
@@ -82,6 +90,8 @@ class NacosConfigCenter(Config):
         """
         异步发布或更新配置
         """
+        if self._init_task:
+            await self._init_task
         res = await self.nacos_client.publish_config(
             ConfigParam(
             data_id=config_name,
@@ -95,6 +105,8 @@ class NacosConfigCenter(Config):
         """
         异步删除配置
         """
+        if self._init_task:
+            await self._init_task
         res = await self.nacos_client.remove_config(
             ConfigParam(
                 data_id=config_name,
@@ -107,6 +119,8 @@ class NacosConfigCenter(Config):
         """
         异步订阅配置变更
         """
+        if self._init_task:
+            await self._init_task
         await self.nacos_client.add_listener(
             listener=listener,
             data_id=config_name,
@@ -117,6 +131,8 @@ class NacosConfigCenter(Config):
         """
         异步取消订阅
         """
+        if self._init_task:
+            await self._init_task
         # 尝试使用 v2 客户端的 unsubscribe 方法
         await self.nacos_client.remove_listener(
             listener=listener,
@@ -128,4 +144,6 @@ class NacosConfigCenter(Config):
         """
         关闭客户端，停止订阅
         """
+        if self._init_task:
+            await self._init_task
         await  self.nacos_client.shutdown()
