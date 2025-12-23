@@ -191,7 +191,7 @@ class LawgenesisService:
         if self.law_server_config.register_center_url:
             # 如果提供了注册中心，则使用 Dubbo 引导程序进行注册
             registry_config = RegistryConfig.from_url(self.law_server_config.register_center_url)
-            registry_config.group = self.law_server_config._group
+            registry_config.group = self.law_server_config.group
             registry_config.version = self.law_server_config.version
             bootstrap = Dubbo(registry_config=registry_config)
             return bootstrap.create_server(service_config)
