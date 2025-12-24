@@ -14,15 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Configuration constants for dubbo-python framework.
+
+This module contains constant definitions related to configuration management,
+including environment settings, versioning, grouping, and transport configuration.
+All constants support environment variable overrides for flexible deployment.
+"""
+
 import os
 
-ENVIRONMENT = os.environ.get("ENVIRONMENT", "environment")
-TEST_ENVIRONMENT = os.environ.get("TEST_ENVIRONMENT", "test")
-DEVELOPMENT_ENVIRONMENT = os.environ.get("DEVELOPMENT_ENVIRONMENT", "develop")
-PRODUCTION_ENVIRONMENT = os.environ.get("PRODUCTION_ENVIRONMENT", "product")
+# --- 环境配置 --- 
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "environment")  # 环境键名
+TEST_ENVIRONMENT = os.environ.get("TEST_ENVIRONMENT", "test")  # 测试环境标识
+DEVELOPMENT_ENVIRONMENT = os.environ.get("DEVELOPMENT_ENVIRONMENT", "develop")  # 开发环境标识
+PRODUCTION_ENVIRONMENT = os.environ.get("PRODUCTION_ENVIRONMENT", "product")  # 生产环境标识
 
-VERSION = os.environ.get("VERSION", "version")
-GROUP = os.environ.get("GROUP", "group")
+# --- 版本与分组 --- 
+VERSION = os.environ.get("VERSION", "version")  # 版本键名
+GROUP = os.environ.get("GROUP", "group")  # 分组键名
 
-TRANSPORT = os.environ.get("TRANSPORT", "transport")
-AIO_TRANSPORT = os.environ.get("AIO_TRANSPORT", "aio")
+# --- 传输层配置 --- 
+TRANSPORT = os.environ.get("TRANSPORT", "transport")  # 传输层键名
+AIO_TRANSPORT = os.environ.get("AIO_TRANSPORT", "aio")  # 异步IO传输层标识

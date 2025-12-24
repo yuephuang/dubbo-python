@@ -13,3 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""
+Constants package for dubbo-python.
+
+This package contains all the constant definitions used across the dubbo-python framework,
+including common constants, configuration constants, logger constants, and registry constants.
+"""

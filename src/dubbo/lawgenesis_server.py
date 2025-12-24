@@ -18,7 +18,7 @@ import threading
 import time
 from contextlib import contextmanager
 from functools import wraps
-from typing import Union, Callable, Optional
+from typing import Union, Callable, Optional, Any
 
 # --- 第三方库导入 ---
 import orjson
@@ -27,6 +27,7 @@ import requests
 # --- 本地应用/库导入 ---
 from dubbo import Dubbo, Server
 from dubbo.cache.cache_client import CacheClient
+from dubbo.component.asynchronous import AsyncRpcCallable
 from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig, NotifyConfig, LAW_SERVER_CONFIG, \
     METHOD_CONFIG, NOTIFY_CONFIG
 from dubbo.configs import ServiceConfig, RegistryConfig
@@ -48,6 +49,13 @@ from dubbo.proxy.handlers import RpcServiceHandler, RpcMethodHandler
 # --- 全局常量和配置 ---
 _LOGGER = loggerFactory.get_logger()
 
+
+
+try:
+    async_rpc_callable = AsyncRpcCallable()
+except Exception as e:
+    _LOGGER.error(f"初始化 AsyncRpcCallable 失败: {e}")
+    async_rpc_callable = None
 
 # --- 上下文管理器 --- 
 @contextmanager
@@ -237,7 +245,7 @@ class LawgenesisService:
     # --- 方法装饰器 --- 
     def methods(self, method_name: str, 
                 method_config: Optional[LawMethodConfig] = None, 
-                protobuf_type: str = "txt"):
+                protobuf_type: str = "txt", async_type: bool = True):
         """
         方法注册装饰器工厂，用于包装和暴露业务方法。
         
@@ -319,6 +327,22 @@ class LawgenesisService:
                             ).to_bytes(),
                         )
 
+                    if async_type:
+                        # 异步调用
+                        try:
+                            task_id = async_rpc_callable.pushlish_task(method_name, request_data)
+                            _LOGGER.info(f"[{method_name}] Async task published, task_id: {task_id}, trace_id: {law_metadata.trace_id}")
+                            return self._create_response(
+                                base_data=law_metadata.basedata,
+                                data=ResponseProto(
+                                    data={"task_id": task_id},
+                                    context_id=serialize_func.context_id,
+                                    code=GRpcCode.OK.value
+                                ).to_bytes()
+                            )
+                        except Exception as e:
+                            _LOGGER.error(f"[{method_name}] Async task failed, trace_id: {law_metadata.trace_id}, e: {e}", exc_info=True)
+
                     # 5. 缓存获取
                     if law_metadata.is_cache:
                         cached_data = self._get_cache(method_name, serialize_func.cache_key)
@@ -383,7 +407,11 @@ class LawgenesisService:
             
             # 4. 注册指标收集
             self._metrics_collector.register_metrics(method_name=method_name)
-            
+
+            # 5, 注册异步执行器
+            async_rpc_callable.register_method(method_name=method_name, thread_num=1, method_instance=func)
+
+
             _LOGGER.info(f"Method '{method_name}' registered with caching and rate limiting.")
             return wrapper
 
@@ -394,15 +422,21 @@ class LawgenesisService:
         自定义方法，用于处理特殊业务逻辑。
         """
         @self.methods("health")
-        def health_check(request: lawgenesis_pb2.LawgenesisRequest) -> lawgenesis_pb2.LawgenesisReply:
+        def health_check(request: Any, law_basedata: LawMetaData) -> lawgenesis_pb2.LawgenesisReply:
             """
             健康检查方法，用于验证服务是否正常运行。
 
             :param request: LawgenesisRequest实例
             :return: LawgenesisReply实例
             """
-            _LOGGER.info(f"Health check request received, context_id: {request.BADA.context_id}")
-            return self._create_response(base_data=request.BADA, data=b"Healthy")
+            return self._create_response(
+                                base_data=law_basedata.basedata,
+                                data=ResponseProto(
+                                    data=b"healthy",
+                                    context_id=request.context_id,
+                                    code=GRpcCode.OK.value
+                                ).to_bytes()
+                            )
 
 
     # --- 辅助方法 --- 
@@ -490,7 +524,7 @@ class LawgenesisService:
         await self.law_server_config.async_start_reloader()
         await self.law_method_config.async_start_reloader()
         await self.notify_config.async_start_reloader()
-        
+        async_rpc_callable.start_consumer()
         _LOGGER.info("Configuration subscribers started successfully.")
         
         # 保持任务运行

@@ -6,6 +6,8 @@ import redis.asyncio as aioredis
 from redis.asyncio.cluster import RedisCluster as AsyncRedisCluster
 from redis.cluster import RedisCluster
 
+from dubbo.constants import common_constants
+
 
 class AsyncRedisClient:
     """
@@ -120,10 +122,10 @@ class RedisClient:
         self,
         nodes: Optional[Union[str, list]] = None,
         *,
-        host: str = "localhost",
-        port: int = 6379,
-        db: int = 0,
-        password: Optional[str] = None,
+        host: str = common_constants.REDIS_HOST,
+        port: int = common_constants.REDIS_PORT,
+        db: int = common_constants.REDIS_DB,
+        password: Optional[str] = common_constants.REDIS_PASSWORD,
         socket_timeout: int = 5,
         decode_responses: bool = True,
         startup_nodes: Optional[list] = None,
