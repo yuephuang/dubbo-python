@@ -494,8 +494,9 @@ class ServiceConfig(AbstractConfig):
         super().__init__()
 
         self._service_handler = service_handler
+        # self._host = host or NetworkUtils.get_local_address() or common_constants.LOCAL_HOST_VALUE
         self._host = host or NetworkUtils.get_local_address() or common_constants.LOCAL_HOST_VALUE
-        self._port = port or common_constants.DEFAULT_PORT
+        self._port = port or common_constants.DEFAULT_SERVER_PORT
         self._protocol = protocol or common_constants.TRIPLE_SHORT
 
     @property

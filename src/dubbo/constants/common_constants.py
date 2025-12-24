@@ -37,8 +37,22 @@ SERVICE_HANDLER_KEY = os.environ.get("SERVICE_HANDLER_KEY", "service-handler")
 GROUP_KEY = os.environ.get("GROUP_KEY", "group")
 
 LOCAL_HOST_KEY = os.environ.get("LOCAL_HOST_KEY", "localhost")
-LOCAL_HOST_VALUE = os.environ.get("LOCAL_HOST_VALUE", "127.0.0.1")
-DEFAULT_PORT = int(os.environ.get("DEFAULT_PORT", 50051))
+LOCAL_HOST_VALUE = os.environ.get("LOCAL_HOST_VALUE", "0.0.0.0")
+DEFAULT_SERVER_PORT = int(os.environ.get("DEFAULT_PORT", 50001))
+DEFAULT_SERVER_NAME = os.environ.get("DEFAULT_SERVER_NAME", "lawgenesis")
+DEFAULT_SERVER_VERSION = os.environ.get("DEFAULT_SERVER_VERSION", "1.0.0")
+
+ENV_KEY = os.environ.get("ENV_KEY", "dev")
+
+
+NACOS_HOST = os.environ.get("NACOS_HOST", "")
+NACOS_PORT = os.environ.get("NACOS_PORT", "")
+NACOS_NAMESPACE = os.environ.get("NACOS_NAMESPACE", "")
+NACOS_USERNAME = os.environ.get("NACOS_USERNAME", "")
+NACOS_PASSWORD = os.environ.get("NACOS_PASSWORD", "")
+NACOS_URL = os.environ.get("NACOS_URL", f"nacos://{NACOS_USERNAME}:{NACOS_PASSWORD}@{NACOS_HOST}:{NACOS_PORT}?namespace={NACOS_NAMESPACE}")
+
+PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "")
 
 SSL_ENABLED_KEY = os.environ.get("SSL_ENABLED_KEY", "ssl-enabled")
 

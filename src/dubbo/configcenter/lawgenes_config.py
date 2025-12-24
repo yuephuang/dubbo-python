@@ -3,11 +3,12 @@ import asyncio
 from typing import Union, Dict, Any
 
 from dubbo.configcenter import NacosConfigCenter, Config
-from dubbo.constants.nacos_constants import NACOS_GROUP, NACOS_URL
+from dubbo.constants import common_constants
 from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 
+NACOS_GROUP = f"{common_constants.DEFAULT_SERVER_NAME}_{common_constants.ENV_KEY}"
 
 class ConfigReloader:
     """
@@ -19,7 +20,7 @@ class ConfigReloader:
     # 实现客户端单例缓存
     _client_instance: Config = None
     config_name = ""
-    group = NACOS_GROUP
+    group = common_constants.GROUP_KEY
 
     def __init__(self):
         pass
@@ -31,7 +32,7 @@ class ConfigReloader:
         确保在整个应用生命周期内只创建一个客户端实例。
         """
         if cls._client_instance is None:
-            cls._client_instance = NacosConfigCenter(url=NACOS_URL)
+            cls._client_instance = NacosConfigCenter(url=common_constants.NACOS_URL)
         return cls._client_instance
 
     @staticmethod
@@ -59,20 +60,22 @@ class ConfigReloader:
     @classmethod
     def update_cls(cls, content):
         # 遍历配置字典，更新类实例属性
-        if cls.config_name.endswith(".json"):
-            # 处理 JSON 格式的配置
+        _LOGGER.info(f"Update config, {cls.config_name}, {content}")
+        try:
             content = ast.literal_eval(content)
             for key, value in content.items():
                 setattr(cls, key, value)
-
+        except Exception as e:
+            _LOGGER.error(f"Update config: {content}, failed: {e}")
 
 
     async def start_reloader(self):
         """
-        启动配置重载器。
+        启动配置重载器。如果没有配置
         """
         content = await self.client().async_get_config(config_name=self.config_name, group=self.group)
         self.update_cls(content)
+
 
     async def async_start_reloader(self):
         """
@@ -80,18 +83,7 @@ class ConfigReloader:
         """
         config_name = self.config_name
         group = self.group
-        client = self.client()  # 现在获取的是单例实例
-
-        _LOGGER.info(f"Starting initial config fetch for: {config_name}/{group}")
-
-        # 1. 初始化获取配置 (非阻塞)
-        data = await client.async_get_config(
-            config_name=config_name,
-            group=group
-        )
-        self.update_cls(data)
-        _LOGGER.info(f"Initial config loaded successfully: {config_name}/{group}")
-
+        client = NacosConfigCenter(url=common_constants.NACOS_URL)
         # 2. 定义配置变更监听器 (非阻塞订阅)
         try:
             # 异步地设置订阅，这个 await 应该会立即返回，而订阅任务在后台运行
@@ -112,23 +104,23 @@ class LawServerConfig(ConfigReloader):
     服务配置类
     """
     config_name = f"{NACOS_GROUP}_server.json"
-    name = None
-    version = None
-    host = None
-    port = None
-    server_group = None
-    env = None
-    register_center_url = None
-    pushgateway_url = None
+    name = common_constants.DEFAULT_SERVER_NAME
+    version = common_constants.DEFAULT_SERVER_VERSION
+    host = common_constants.LOCAL_HOST_VALUE
+    port = common_constants.DEFAULT_SERVER_PORT
+    server_group = common_constants.GROUP_KEY
+    env = common_constants.ENV_KEY
+    register_center_url = common_constants.NACOS_URL
+    pushgateway_url = common_constants.PUSHGATEWAY_URL
 
 class LawClientConfig(ConfigReloader):
     """
     客户端配置类
     """
-    config_name = f"{NACOS_GROUP}_client.json"
-    name = None
-    version = None
-    client_group = None
+    config_name = f"{common_constants.GROUP_KEY}_client.json"
+    name = common_constants.DEFAULT_SERVER_NAME
+    version = common_constants.DEFAULT_SERVER_VERSION
+    client_group = common_constants.GROUP_KEY
     env = None
     load_balance = None
     server_url = None
@@ -280,13 +272,23 @@ class NotifyConfig(ConfigReloader):
     """
     The notify configuration.
     """
-    def __init__(self):
-        """
-        Initialize the notify configuration.
-        """
-        super().__init__()
-        self.config_name = "notify"
-        self.url = ""
+    config_name = f"{NACOS_GROUP}_notify.json"
+    url = ""
 
 
 
+LAW_SERVER_CONFIG = LawServerConfig()
+METHOD_CONFIG = LawMethodConfig()
+NOTIFY_CONFIG = NotifyConfig()
+
+# 初次加载配置
+async def start_server_subscribe():
+    """
+    Start the server subscription.
+    """
+    # 初次加载配置
+    await LAW_SERVER_CONFIG.start_reloader()
+    await METHOD_CONFIG.start_reloader()
+    await NOTIFY_CONFIG.start_reloader()
+
+asyncio.run(start_server_subscribe())

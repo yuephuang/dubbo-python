@@ -17,6 +17,9 @@ class RataLimitFactory(ABC):
         self.server = server
         self.options = options
         self.limit_client = {"common": self.fixed_window(100, 10)}
+        self._load_limit()
+
+    def _load_limit(self):
         for key, value in self.limit_config.items():
             if value.limits_strategies == "fixed_window":
                 self.limit_client[key] = self.fixed_window(value.limits_storge_amount, value.limits_storge_multiples)
@@ -30,6 +33,7 @@ class RataLimitFactory(ABC):
                 self.limit_client[key] = self.gcra(value.limits_storge_amount, value.limits_storge_multiples)
             else:
                 self.limit_client[key] = self.fixed_window(value.limits_storge_amount, value.limits_storge_multiples)
+
 
     def fixed_window(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
         return Throttled(

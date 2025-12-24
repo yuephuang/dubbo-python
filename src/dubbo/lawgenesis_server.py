@@ -27,7 +27,8 @@ import requests
 # --- 本地应用/库导入 ---
 from dubbo import Dubbo, Server
 from dubbo.cache.cache_client import CacheClient
-from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig, NotifyConfig
+from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig, NotifyConfig, LAW_SERVER_CONFIG, \
+    METHOD_CONFIG, NOTIFY_CONFIG
 from dubbo.configs import ServiceConfig, RegistryConfig
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto import (
@@ -70,9 +71,9 @@ class LawgenesisService:
     """
 
     def __init__(self, 
-                 law_server_config: LawServerConfig = LawServerConfig(),
-                 method_config: LawMethodConfig = LawMethodConfig(),
-                 notify_config: Optional[NotifyConfig] = None
+                 law_server_config: LawServerConfig = LAW_SERVER_CONFIG,
+                 method_config: LawMethodConfig = METHOD_CONFIG,
+                 notify_config: Optional[NotifyConfig] = NOTIFY_CONFIG,
                  ):
         """
         初始化LawgenesisService实例。
@@ -254,7 +255,9 @@ class LawgenesisService:
         :param protobuf_type: 期望的Protobuf类型（默认为"txt"）
         :return: 装饰器函数
         """
-
+        if method_config in ["healthy"]:
+            raise ValueError(f"{method_name} is a reserved method name")
+        method_config = method_config or self.law_method_config
         def decorator(func: Callable):
             """
             实际的装饰器，包装用户提供的业务函数。
@@ -367,9 +370,6 @@ class LawgenesisService:
                         cost_time = (end_time - start_time) * 1000
                         _LOGGER.info(f"[{method_name}] Request end, cost: {cost_time:.4f}ms, trace_id: {law_metadata.trace_id}")
 
-            # --- 装饰器工厂执行部分 ---
-            method_config = self.law_method_config
-            
             # 1. 注册方法处理器
             self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
 
@@ -388,6 +388,22 @@ class LawgenesisService:
             return wrapper
 
         return decorator
+
+    def custom_method(self):
+        """
+        自定义方法，用于处理特殊业务逻辑。
+        """
+        @self.methods("health")
+        def health_check(request: lawgenesis_pb2.LawgenesisRequest) -> lawgenesis_pb2.LawgenesisReply:
+            """
+            健康检查方法，用于验证服务是否正常运行。
+
+            :param request: LawgenesisRequest实例
+            :return: LawgenesisReply实例
+            """
+            _LOGGER.info(f"Health check request received, context_id: {request.BADA.context_id}")
+            return self._create_response(base_data=request.BADA, data=b"Healthy")
+
 
     # --- 辅助方法 --- 
     @staticmethod
@@ -511,7 +527,8 @@ class LawgenesisService:
         - 处理服务关闭信号
         """
         _LOGGER.info(f"Starting Dubbo server: {self.law_server_config.name}...")
-        
+        # 加载自定义方法
+        self.custom_method()
         # 启动Dubbo服务器
         self._server.start()
         _LOGGER.info(f"Dubbo server '{self.law_server_config.name}' started successfully.")
@@ -576,8 +593,6 @@ class LawgenesisService:
             elements=[self._get_server_metadata()]
         )
         _LOGGER.info("Server stopped successfully.")
-
-
 
     def start(self):
         """
