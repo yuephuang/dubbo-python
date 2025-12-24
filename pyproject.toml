@@ -20,7 +20,7 @@ build-backend = "hatchling.build"
 
 [project]
 name="lawgenesis-dubbo"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     {name = "Apache Dubbo Community", email = "dev@dubbo.apache.org"}
 ]
@@ -62,6 +62,8 @@ dependencies = [
     "throttled-py[all]>=2.2.3",
     "blinker>=1.9.0",
     "loguru>=0.7.3",
+    "redis==7.1.0",
+    "aioredis[all]>=2.0.1",
 ]
 dynamic = ["version", "readme"]
 
@@ -172,7 +174,7 @@ check_untyped_defs = true
 
 ### Pytest settings ###
 [tool.pytest]
-addopts = "-rxXs"
+addopts = ["-rxXs"]
 testpaths = ["tests"]
 python_files = [
     "test_*.py"
