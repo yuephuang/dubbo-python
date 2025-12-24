@@ -356,7 +356,7 @@ class LawgenesisService:
 
                     # 6. 执行业务逻辑
                     try:
-                        response = func(serialize_func, law_metadata)
+                        response = func(serialize_func)
                         
                         # 7. 响应格式检查
                         if not isinstance(response, dict):
