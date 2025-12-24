@@ -554,6 +554,31 @@ class LawgenesisService:
             )
             _LOGGER.info("Server stopped successfully.")
 
+    async def async_stop(self):
+        """
+        异步停止服务，执行完整的服务停止流程。
+
+        包括：
+        - 关闭Dubbo服务器
+        - 发送服务停止通知
+        - 清理资源
+        """
+        _LOGGER.info(f"Stopping Dubbo server: {self.law_server_config.name}...")
+
+        # 关闭Dubbo服务器
+        self.run = False
+        _LOGGER.info(f"Dubbo server '{self.law_server_config.name}' stopped successfully.")
+
+        # 发送停止通知
+        await self._notify_factory.async_send_table(
+            title="🔴服务停止",
+            subtitle=self.law_server_config.name,
+            elements=[self._get_server_metadata()]
+        )
+        _LOGGER.info("Server stopped successfully.")
+
+
+
     def start(self):
         """
         服务的同步启动入口点。
@@ -568,5 +593,5 @@ class LawgenesisService:
         except Exception as e:
             _LOGGER.error(f"Error in main thread: {e}")
         finally:
-            self.notify_config
+            asyncio.run(self.async_stop())
             _LOGGER.info("Exiting main thread.")
