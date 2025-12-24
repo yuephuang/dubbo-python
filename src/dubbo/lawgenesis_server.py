@@ -245,7 +245,8 @@ class LawgenesisService:
     # --- 方法装饰器 --- 
     def methods(self, method_name: str, 
                 method_config: Optional[LawMethodConfig] = None, 
-                protobuf_type: str = "txt", async_type: bool = True):
+                protobuf_type: str = "txt",
+                async_type: bool = True):
         """
         方法注册装饰器工厂，用于包装和暴露业务方法。
         
@@ -411,9 +412,9 @@ class LawgenesisService:
             # 5, 注册异步执行器
             async_rpc_callable.register_method(method_name=method_name, thread_num=1, method_instance=func)
 
-
             _LOGGER.info(f"Method '{method_name}' registered with caching and rate limiting.")
             return wrapper
+
 
         return decorator
 
@@ -422,21 +423,14 @@ class LawgenesisService:
         自定义方法，用于处理特殊业务逻辑。
         """
         @self.methods("health")
-        def health_check(request: Any, law_basedata: LawMetaData) -> lawgenesis_pb2.LawgenesisReply:
+        def health_check(request: Any, law_basedata: LawMetaData=None) -> bool:
             """
             健康检查方法，用于验证服务是否正常运行。
 
             :param request: LawgenesisRequest实例
             :return: LawgenesisReply实例
             """
-            return self._create_response(
-                                base_data=law_basedata.basedata,
-                                data=ResponseProto(
-                                    data=b"healthy",
-                                    context_id=request.context_id,
-                                    code=GRpcCode.OK.value
-                                ).to_bytes()
-                            )
+            return True
 
 
     # --- 辅助方法 --- 
@@ -524,7 +518,6 @@ class LawgenesisService:
         await self.law_server_config.async_start_reloader()
         await self.law_method_config.async_start_reloader()
         await self.notify_config.async_start_reloader()
-        async_rpc_callable.start_consumer()
         _LOGGER.info("Configuration subscribers started successfully.")
         
         # 保持任务运行
@@ -573,6 +566,7 @@ class LawgenesisService:
             subtitle=self.law_server_config.name, 
             elements=[self._get_server_metadata()]
         )
+        async_rpc_callable.start_consumer()
 
         try:
             # 主循环：定期推送指标

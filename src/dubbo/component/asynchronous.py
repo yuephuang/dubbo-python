@@ -10,7 +10,7 @@ from dubbo.component.redis_client import RedisClient
 # 配置日志
 _LOGGER = loggerFactory.get_logger()
 
-
+cls_method_config = {}
 
 class AsyncRpcCallable:
     """
@@ -18,7 +18,6 @@ class AsyncRpcCallable:
     支持按方法配置独立队列和并发线程数
     """
     # 存储格式: { method_name: {"instance": func, "thread_num": int} }
-    cls_method_config = {}
     QUEUE_PREFIX = f"rpc_queue_{common_constants.DEFAULT_SERVER_NAME}_{common_constants.ENV_KEY}"
     RESULT_EXPIRE = 3600
     try:
@@ -32,15 +31,15 @@ class AsyncRpcCallable:
         self._stop_event = threading.Event()
         self._threads = []
 
-    @classmethod
-    def register_method(cls, method_name: str, method_instance: Callable, thread_num: int = 1):
+    @staticmethod
+    def register_method(method_name: str, method_instance: Callable, thread_num: int = 1):
         """
         注册方法，并指定处理该方法的后台线程数量
         :param method_name: 方法名
         :param method_instance: 回调函数
         :param thread_num: 该方法的并发消费者线程数
         """
-        cls.cls_method_config[method_name] = {
+        cls_method_config[method_name] = {
             "instance": method_instance,
             "thread_num": max(1, thread_num)
         }
@@ -50,7 +49,7 @@ class AsyncRpcCallable:
         """
         发布任务到该方法专属的队列中
         """
-        if method_name not in self.cls_method_config:
+        if method_name not in cls_method_config:
             raise Exception(f"方法 '{method_name}' 未注册")
 
         task_id = str(uuid.uuid4())
@@ -76,8 +75,8 @@ class AsyncRpcCallable:
         """
         特定方法的消费者线程逻辑
         """
-        queue_key = f"{self.QUEUE_PREFIX}{method_name}"
-        handler = self.cls_method_config[method_name]["instance"]
+        queue_key = f"{self.QUEUE_PREFIX}_{method_name}"
+        handler = cls_method_config[method_name]["instance"]
 
         _LOGGER.info(f"线程 {threading.current_thread().name} 开始监听队列: {queue_key}")
 
@@ -95,8 +94,9 @@ class AsyncRpcCallable:
 
                     # 执行业务逻辑
                     try:
-                        result = handler(**params) if isinstance(params, dict) else handler(params)
+                        result = handler(params)
                         status = "success"
+                        _LOGGER.info(f"任务 {task_id} 执行成功")
                     except Exception as e:
                         result = str(e)
                         status = "error"
@@ -121,7 +121,8 @@ class AsyncRpcCallable:
         """
         为所有注册的方法启动指定数量的后台线程
         """
-        for method_name, config in self.cls_method_config.items():
+        for method_name, config in cls_method_config.items():
+            _LOGGER.info(f"启动消费者线程: {method_name}")
             thread_num = config.get("thread_num", 1)
             for i in range(thread_num):
                 t_name = f"Worker-{method_name}-{i + 1}"
