@@ -67,7 +67,7 @@ class ProtobufInterface:
         Returns:
             必须的参数，转换为json
         """
-        return {}
+        return self.json
 
     @property
     def param2bytes(self) -> bytes:

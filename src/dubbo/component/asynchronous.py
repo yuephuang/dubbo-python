@@ -3,6 +3,8 @@ import threading
 import uuid
 from typing import Callable
 
+import httpx
+
 from dubbo.constants import common_constants
 from dubbo.loggers import loggerFactory
 from dubbo.component.redis_client import RedisClient
@@ -109,6 +111,15 @@ class AsyncRpcCallable:
                         "result": result,
                         "task_id": task_id
                     })
+                    try:
+                        if params.get("callback_url", False):
+                            with httpx.Client() as client:
+                                resp = client.post(params.get("callback_url"), json=result_data)
+                                _LOGGER.info(f"任务 {task_id} 回调响应状态码: {resp.status_code}")
+                                resp.raise_for_status()
+                            _LOGGER.info(f"任务 {task_id} 等待结果")
+                    except Exception as e:
+                        _LOGGER.error(f"任务 {task_id} 回调失败: {e}")
                     self.redis.set(result_key, result_data, ex=self.RESULT_EXPIRE)
 
             except Exception as e:

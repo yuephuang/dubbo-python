@@ -331,6 +331,7 @@ class LawgenesisService:
                     if async_type:
                         # 异步调用
                         try:
+                            request_data["callback_url"] = law_metadata.callback_url
                             task_id = async_rpc_callable.pushlish_task(method_name, request_data)
                             _LOGGER.info(f"[{method_name}] Async task published, task_id: {task_id}, trace_id: {law_metadata.trace_id}")
                             return self._create_response(
