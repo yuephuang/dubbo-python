@@ -66,6 +66,14 @@ NACOS_NAMESPACE = os.environ.get("NACOS_NAMESPACE", "")  # Nacos命名空间
 NACOS_USERNAME = os.environ.get("NACOS_USERNAME", "")  # Nacos用户名
 NACOS_PASSWORD = os.environ.get("NACOS_PASSWORD", "")  # Nacos密码
 NACOS_URL = os.environ.get("NACOS_URL", f"nacos://{NACOS_USERNAME}:{NACOS_PASSWORD}@{NACOS_HOST}:{NACOS_PORT}?namespace={NACOS_NAMESPACE}")  # Nacos完整URL
+NACOS_METAINFO = {
+    "dubbo": DUBBO_VALUE,
+    "environment": ENV_KEY,
+    "application": DEFAULT_SERVER_NAME,
+    "version": DEFAULT_SERVER_VERSION,
+    "GROUP_KEY": GROUP_KEY,
+}
+
 
 # redis 配置
 REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")  # Redis服务器主机

@@ -25,7 +25,7 @@ from dubbo.url import URL
 
 _LOGGER = loggerFactory.get_logger()
 
-DEFAULT_APPLICATION = "DEFAULT"
+DEFAULT_APPLICATION = common_constants.DEFAULT_SERVER_NAME
 
 __all__ = ["NacosRegistry", "NacosRegistryFactory"]
 
@@ -124,15 +124,7 @@ class NacosRegistry(Registry):
 
         nacos_service_name = _build_nacos_service_name(url)
 
-        metadata = {
-            "side": "provider",
-            "release": f"{dubbo.__version__}_py",
-            "protocol": "tri",
-            "application": DEFAULT_APPLICATION,
-            "category": registry_constants.PROVIDERS_CATEGORY,
-            "enabled": "true",
-            "disabled": "false",
-        }
+        metadata = common_constants.NACOS_METAINFO
         self._nacos_client.add_naming_instance(
             nacos_service_name,
             ip,

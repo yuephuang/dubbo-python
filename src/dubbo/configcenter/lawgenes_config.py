@@ -124,7 +124,7 @@ class LawClientConfig(ConfigReloader):
     env = None
     load_balance = None
     server_url = None
-    register_center_url = None
+    register_center_url = common_constants.NACOS_URL
 
 
 class MethodCacheConfig:
