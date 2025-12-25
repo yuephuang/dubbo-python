@@ -42,7 +42,6 @@ class NacosSubscriber:
         self._listener = listener
         self._timer_manager = NacosTimerManager()
         self._subscribed = False
-        self._cache_url = []
 
     def refresh_instances(self):
         """
@@ -59,12 +58,9 @@ class NacosSubscriber:
                 for h in hosts
                 if h["enabled"]
             ]
-            self._cache_url = urls
             self._listener.notify(urls=urls)
         except Exception as e:
             _LOGGER.error("nacos subscriber refresh_instance failed: %s", e)
-            print(self._cache_url)
-            self._listener.notify(urls=self._cache_url)
 
     def subscribe(self):
         """

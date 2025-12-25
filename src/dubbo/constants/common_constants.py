@@ -65,7 +65,7 @@ NACOS_PORT = os.environ.get("NACOS_PORT", "")  # Nacos服务器端口
 NACOS_NAMESPACE = os.environ.get("NACOS_NAMESPACE", "")  # Nacos命名空间
 NACOS_USERNAME = os.environ.get("NACOS_USERNAME", "")  # Nacos用户名
 NACOS_PASSWORD = os.environ.get("NACOS_PASSWORD", "")  # Nacos密码
-NACOS_URL = os.environ.get("NACOS_URL", f"nacos://{NACOS_USERNAME}:{NACOS_PASSWORD}@{NACOS_HOST}:{NACOS_PORT}?namespace={NACOS_NAMESPACE}")  # Nacos完整URL
+NACOS_URL = os.environ.get("NACOS_URL")  # Nacos完整URL
 NACOS_METAINFO = {
     "dubbo": DUBBO_VALUE,
     "environment": ENV_KEY,

@@ -73,8 +73,11 @@ class ConfigReloader:
         """
         启动配置重载器。如果没有配置
         """
-        content = await self.client().async_get_config(config_name=self.config_name, group=self.group)
-        self.update_cls(content)
+        try:
+            content = await self.client().async_get_config(config_name=self.config_name, group=self.group)
+            self.update_cls(content)
+        except Exception as e:
+            _LOGGER.error(f"Get config: {self.config_name}, failed: {e}")
 
 
     async def async_start_reloader(self):
