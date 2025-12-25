@@ -41,6 +41,8 @@ class NacosConfigCenter(Config):
         except RuntimeError:
             # 如果没有运行中的事件循环，则运行它
             asyncio.run(self._init_nacos_client())
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize NacosConfigService: {e}")
 
     async def _init_nacos_client(self) -> NacosConfigService:
         """

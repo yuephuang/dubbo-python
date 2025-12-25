@@ -120,3 +120,6 @@ PATH_SEPARATOR = os.environ.get("PATH_SEPARATOR", "/")  # 路径分隔符
 PROTOCOL_SEPARATOR = os.environ.get("PROTOCOL_SEPARATOR", "://")  # 协议分隔符
 ANY_VALUE = os.environ.get("ANY_VALUE", "*")  # 通配符值
 COMMA_SEPARATOR = os.environ.get("COMMA_SEPARATOR", ",")  # 逗号分隔符
+
+# other
+SERVER_THREAD_POOL_SIZE = int(os.environ.get("SERVER_THREAD_POOL_SIZE", 10))  # 服务器线程池大小

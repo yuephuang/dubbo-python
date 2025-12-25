@@ -15,8 +15,8 @@
 # limitations under the License.
 
 import asyncio
-import concurrent
 import threading
+from concurrent.futures import Future
 from typing import Union
 
 from dubbo.constants import common_constants
@@ -97,7 +97,7 @@ class AioClient(Client, ConnectionStateListener):
             elif not self._event_loop.started:
                 self._event_loop.start()
 
-            future = concurrent.futures.Future()
+            future = Future()
             asyncio.run_coroutine_threadsafe(self._do_connect(future), self._event_loop.loop)
 
             try:
@@ -110,7 +110,7 @@ class AioClient(Client, ConnectionStateListener):
             except Exception:
                 raise RemotingError(f"Failed to connect to the server. host: {self._url.host}, port: {self._url.port}")
 
-    async def _do_connect(self, future: Union[concurrent.futures.Future, asyncio.Future]):
+    async def _do_connect(self, future: Union[Future, asyncio.Future]):
         """
         Connect to the server.
         """
@@ -219,7 +219,7 @@ class AioServer(Server):
         elif self.is_closed():
             raise RemotingError("The server is closed.")
 
-        async def _inner_operation(_future: concurrent.futures.Future):
+        async def _inner_operation(_future: Future):
             try:
                 running_loop = asyncio.get_running_loop()
                 server = await running_loop.create_server(
@@ -236,7 +236,7 @@ class AioServer(Server):
                 FutureHelper.set_exception(_future, e)
 
         # Run the server logic in the event loop.
-        future = concurrent.futures.Future()
+        future = Future()
         asyncio.run_coroutine_threadsafe(_inner_operation(future), self._event_loop.loop)
 
         try:
