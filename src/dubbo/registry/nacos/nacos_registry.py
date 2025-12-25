@@ -14,14 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import fcntl
+import json
+import os
+import pathlib
+from typing import List
+
 from nacos import NacosClient
 from nacos.timer import NacosTimer, NacosTimerManager
 
-import dubbo
 from dubbo.constants import common_constants, registry_constants
 from dubbo.loggers import loggerFactory
 from dubbo.registry import NotifyListener, Registry, RegistryFactory
-from dubbo.url import URL
+from dubbo.url import URL, create_url
 
 _LOGGER = loggerFactory.get_logger()
 
@@ -29,9 +34,10 @@ DEFAULT_APPLICATION = common_constants.DEFAULT_SERVER_NAME
 
 __all__ = ["NacosRegistry", "NacosRegistryFactory"]
 
+
 class NacosSubscriber:
     """
-    Nacos instance subscriber
+    Nacos instance subscriber with local cache and file lock.
     """
 
     def __init__(
@@ -43,35 +49,90 @@ class NacosSubscriber:
         self._timer_manager = NacosTimerManager()
         self._subscribed = False
 
+        # Define cache path: ~/.dubbo/nacos_cache/{service_name}.cache
+        cache_dir = pathlib.Path.home() / ".dubbo" / "nacos_cache"
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            _LOGGER.error("Failed to create nacos cache directory: %s", e)
+
+        # Sanitize service name for filename
+        safe_service_name = service_name.replace(":", "_").replace("/", "_")
+        self._cache_file = cache_dir / f"{safe_service_name}.cache"
+
+    def _save_to_local_cache(self, urls: List[URL]):
+        """Save instance URLs to local file with an exclusive lock."""
+        try:
+            url_data = [url.to_str() for url in urls]
+            with open(self._cache_file, "w", encoding="utf-8") as f:
+                # Apply an exclusive lock (blocking)
+                fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    json.dump(url_data, f)
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    # Release the lock
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        except Exception as e:
+            _LOGGER.warning("Failed to save local cache for %s: %s", self._service_name, e)
+
+    def _read_from_local_cache(self):
+        """Read instance URLs from local file with a shared lock."""
+        if not self._cache_file.exists():
+            return []
+        try:
+            with open(self._cache_file, "r", encoding="utf-8") as f:
+                # Apply a shared lock for reading
+                fcntl.flock(f, fcntl.LOCK_SH)
+                try:
+                    url_data = json.load(f)
+                    return [create_url(u) for u in url_data]
+                finally:
+                    # Release the lock
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        except Exception as e:
+            _LOGGER.warning("Failed to read local cache for %s: %s", self._service_name, e)
+            return []
+
     def refresh_instances(self):
-        """
-        Refresh nacos instances
-        """
         if not self._subscribed:
             return
 
         try:
+            # Try to fetch from Nacos server
             instances = self._nacos_client.list_naming_instance(self._service_name)
-            hosts = instances["hosts"]
-            urls = [
+            hosts = instances.get("hosts", [])
+
+            new_urls = [
                 URL(scheme="tri", host=h["ip"], port=h["port"])
                 for h in hosts
-                if h["enabled"]
+                if h.get("enabled")
             ]
-            self._listener.notify(urls=urls)
+
+            # Success: update local cache and notify
+            self._save_to_local_cache(new_urls)
+            self._listener.notify(urls=new_urls)
+
         except Exception as e:
-            _LOGGER.error("nacos subscriber refresh_instance failed: %s", e)
+            _LOGGER.error(
+                "Nacos server error for %s: %s. Falling back to local cache.",
+                self._service_name,
+                e,
+            )
+            # Fallback: load from local cache if Nacos is down
+            cached_urls = self._read_from_local_cache()
+            if cached_urls:
+                self._listener.notify(urls=cached_urls)
 
     def subscribe(self):
-        """
-        Start timer to watch instances
-        """
         if not self._timer_manager.all_timers().get("refresh_instances"):
             self._timer_manager.add_timer(
                 NacosTimer("refresh_instances", self.refresh_instances, interval=7)
             )
             self._timer_manager.execute()
         self._subscribed = True
+        # Initial refresh: also handled by exception catch
         self.refresh_instances()
 
     def unsubscribe(self):
@@ -121,33 +182,38 @@ class NacosRegistry(Registry):
     def register(self, url: URL) -> None:
         ip = url.host
         port = url.port
-
         nacos_service_name = _build_nacos_service_name(url)
 
         metadata = common_constants.NACOS_METAINFO
-        self._nacos_client.add_naming_instance(
-            nacos_service_name,
-            ip,
-            port,
-            DEFAULT_APPLICATION,
-            metadata=metadata,
-            heartbeat_interval=1,
-        )
+        try:
+            self._nacos_client.add_naming_instance(
+                nacos_service_name,
+                ip,
+                port,
+                DEFAULT_APPLICATION,
+                metadata=metadata,
+                heartbeat_interval=1,
+            )
+        except Exception as e:
+            _LOGGER.error("Failed to register to Nacos: %s", e)
 
     def unregister(self, url: URL) -> None:
         ip = url.host
         port = url.port
         nacos_service_name = _build_nacos_service_name(url)
 
-        self._nacos_client.remove_naming_instance(
-            nacos_service_name, ip=ip, port=port, cluster_name=DEFAULT_APPLICATION
-        )
+        try:
+            self._nacos_client.remove_naming_instance(
+                nacos_service_name, ip=ip, port=port, cluster_name=DEFAULT_APPLICATION
+            )
+        except Exception as e:
+            _LOGGER.error("Failed to unregister from Nacos: %s", e)
 
     def subscribe(self, url: URL, listener: NotifyListener) -> None:
         nacos_service_name = _build_nacos_service_name(url)
 
         subscriber = self._service_subscriber(nacos_service_name, listener)
-        print(f"subscribe {nacos_service_name}")
+        _LOGGER.info("Subscribing to Nacos service: %s", nacos_service_name)
         subscriber.subscribe()
 
     def unsubscribe(self, url: URL, listener: NotifyListener) -> None:
@@ -167,7 +233,9 @@ class NacosRegistry(Registry):
         return self._nacos_client is not None
 
     def destroy(self) -> None:
-        pass
+        # stop all timers
+        for subscriber in self._service_subscriber_mapping.values():
+            subscriber.unsubscribe()
 
 
 class NacosRegistryFactory(RegistryFactory):
