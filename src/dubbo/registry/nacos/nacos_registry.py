@@ -18,6 +18,7 @@ import fcntl
 import json
 import os
 import pathlib
+import threading
 from typing import List
 
 from nacos import NacosClient
@@ -95,25 +96,27 @@ class NacosSubscriber:
             _LOGGER.warning("Failed to read local cache for %s: %s", self._service_name, e)
             return []
 
+    def _get_server_urls(self):
+        # Try to fetch from Nacos server
+        instances = self._nacos_client.list_naming_instance(self._service_name)
+        hosts = instances.get("hosts", [])
+
+        new_urls = [
+            URL(scheme="tri", host=h["ip"], port=h["port"])
+            for h in hosts
+            if h.get("enabled")
+        ]
+
+        # Success: update local cache and notify
+        self._save_to_local_cache(new_urls)
+        self._listener.notify(urls=new_urls)
+
     def refresh_instances(self):
         if not self._subscribed:
             return
 
         try:
-            # Try to fetch from Nacos server
-            instances = self._nacos_client.list_naming_instance(self._service_name)
-            hosts = instances.get("hosts", [])
-
-            new_urls = [
-                URL(scheme="tri", host=h["ip"], port=h["port"])
-                for h in hosts
-                if h.get("enabled")
-            ]
-
-            # Success: update local cache and notify
-            self._save_to_local_cache(new_urls)
-            self._listener.notify(urls=new_urls)
-
+            self._get_server_urls()
         except Exception as e:
             _LOGGER.error(
                 "Nacos server error for %s: %s. Falling back to local cache.",
@@ -213,8 +216,17 @@ class NacosRegistry(Registry):
         nacos_service_name = _build_nacos_service_name(url)
 
         subscriber = self._service_subscriber(nacos_service_name, listener)
-        _LOGGER.info("Subscribing to Nacos service: %s", nacos_service_name)
-        subscriber.subscribe()
+        _LOGGER.info("Subscribing to Nacos service in background: %s", nacos_service_name)
+
+        # Start a background thread to handle subscription tasks (initial refresh, timer setup)
+        # to avoid blocking the main execution flow if Nacos is slow or unreachable.
+        subscriber._get_server_urls()
+        subscribe_thread = threading.Thread(
+            target=subscriber.subscribe,
+            name=f"NacosSubscriberThread-{nacos_service_name}",
+            daemon=True
+        )
+        subscribe_thread.start()
 
     def unsubscribe(self, url: URL, listener: NotifyListener) -> None:
         nacos_service_name = _build_nacos_service_name(url)
@@ -234,8 +246,8 @@ class NacosRegistry(Registry):
 
     def destroy(self) -> None:
         # stop all timers
-        for subscriber in self._service_subscriber_mapping.values():
-            subscriber.unsubscribe()
+        pass
+
 
 
 class NacosRegistryFactory(RegistryFactory):

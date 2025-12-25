@@ -17,6 +17,7 @@ class _InvokeClient:
         self.server_name = server_name
         self.service_url = service_url
         self._executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
+        self._client = None
 
     @staticmethod
     def get_authorization() -> lawgenesis_pb2.Auth:
@@ -25,9 +26,13 @@ class _InvokeClient:
             ACID="lawgenesis",
             ACKY="lawgenesis"
         )
-
     @property
-    def client(self) -> DubboClient:
+    def client(self):
+        if not self._client:
+            self.init_client()
+        return self._client
+
+    def init_client(self) -> DubboClient:
         reference_config = ReferenceConfig(
             service=self.server_name,
             protocol="tri"  # 使用tri协议
@@ -39,12 +44,13 @@ class _InvokeClient:
             registry_config.load_balance = self.client_config.load_balance
             bootstrap = Dubbo(registry_config=registry_config)
             client = bootstrap.create_client(reference_config)
-            return client
-        if not self.service_url:
-            raise Exception("service_url is None")
-        url = create_url(self.service_url)
-        client = DubboClient(reference=ReferenceConfig.from_url(url=url))
-        return client
+        else:
+            if not self.service_url:
+                raise Exception("service_url is None")
+            url = create_url(self.service_url)
+            client = DubboClient(reference=ReferenceConfig.from_url(url=url))
+        self._client = client
+        return self._client
 
     async def async_invoke(self, method_name: str, request_data: "ProtobufInterface") -> lawgenesis_pb2.LawgenesisReply:
         """
