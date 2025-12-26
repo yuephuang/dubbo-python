@@ -13,8 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import concurrent
 from collections.abc import Iterator
+from concurrent.futures import Future
 
 from dubbo.classes import MethodDescriptor
 from dubbo.compression import Compressor, Identity
@@ -74,7 +74,7 @@ class TripleInvoker(Invoker):
         :return: The result of the invocation.
         :rtype: Result
         """
-        future = concurrent.futures.Future()
+        future = Future()
         result = TriResult(future)
         if not self._client.is_connected():
             result.set_exception(RemotingError("The client is not connected to the server."))

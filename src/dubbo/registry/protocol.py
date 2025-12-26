@@ -65,3 +65,13 @@ class RegistryProtocol(Protocol):
 
         # continue the refer process
         return FailfastCluster().join(directory)
+
+    def unexport(self, url: URL):
+        # get the server registry
+        registry = self._factory.get_registry(url)
+
+        ref_url: URL = url.attributes[common_constants.EXPORT_KEY]
+        registry.unregister(ref_url)
+
+
+

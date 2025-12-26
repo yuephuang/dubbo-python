@@ -82,3 +82,10 @@ class Server:
             self._protocol.export(self._url)
 
             self._exported = True
+
+    def stop(self):
+        """
+        Stop the server.
+        """
+        self._protocol.unexport(self._url)
+        self._exported = False

@@ -49,7 +49,7 @@ class NacosSubscriber:
         self._listener = listener
         self._timer_manager = NacosTimerManager()
         self._subscribed = False
-
+        self._urls = {}
         # Define cache path: ~/.dubbo/nacos_cache/{service_name}.cache
         cache_dir = pathlib.Path.home() / ".dubbo" / "nacos_cache"
         try:
@@ -108,10 +108,14 @@ class NacosSubscriber:
         ]
 
         # Success: update local cache and notify
+        self. _urls = new_urls
         self._save_to_local_cache(new_urls)
         self._listener.notify(urls=new_urls)
 
     def refresh_instances(self):
+        """
+        Nocos > cache > local_cache
+        """
         if not self._subscribed:
             return
 
@@ -123,8 +127,11 @@ class NacosSubscriber:
                 self._service_name,
                 e,
             )
-            # Fallback: load from local cache if Nacos is down
-            cached_urls = self._read_from_local_cache()
+            if self._urls :
+                cached_urls = self._urls
+            else:
+                # Fallback: load from local cache if Nacos is down
+                cached_urls = self._read_from_local_cache()
             if cached_urls:
                 self._listener.notify(urls=cached_urls)
 
@@ -204,11 +211,11 @@ class NacosRegistry(Registry):
         ip = url.host
         port = url.port
         nacos_service_name = _build_nacos_service_name(url)
-
         try:
-            self._nacos_client.remove_naming_instance(
+            resp = self._nacos_client.remove_naming_instance(
                 nacos_service_name, ip=ip, port=port, cluster_name=DEFAULT_APPLICATION
             )
+            _LOGGER.info(f"unregister: {ip}, {port}, {nacos_service_name}, {DEFAULT_APPLICATION}, {resp}")
         except Exception as e:
             _LOGGER.error("Failed to unregister from Nacos: %s", e)
 

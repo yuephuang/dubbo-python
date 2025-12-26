@@ -121,3 +121,6 @@ class Protocol(abc.ABC):
         :rtype: Invoker
         """
         raise NotImplementedError()
+
+    def unexport(self, url: URL):
+        raise NotImplementedError()

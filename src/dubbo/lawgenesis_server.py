@@ -610,7 +610,8 @@ class LawgenesisService:
         - 清理资源
         """
         _LOGGER.info(f"Stopping Dubbo server: {self.law_server_config.name}...")
-
+        # 停止需要等待一会，10s后自动停止
+        await asyncio.sleep(300)
         # 关闭Dubbo服务器
         self.run = False
         _LOGGER.info(f"Dubbo server '{self.law_server_config.name}' stopped successfully.")
@@ -637,5 +638,15 @@ class LawgenesisService:
         except Exception as e:
             _LOGGER.error(f"Error in main thread: {e}")
         finally:
+            self._server.stop()
             asyncio.run(self.async_stop())
             _LOGGER.info("Exiting main thread.")
+
+    def stop(self):
+        """
+        服务的同步停止入口点。
+
+        使用asyncio.run()运行async_stop协程，
+        阻塞主线程直到服务停止。
+        """
+        self.stop()
