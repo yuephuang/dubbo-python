@@ -32,7 +32,7 @@ class ConfigReloader:
         确保在整个应用生命周期内只创建一个客户端实例。
         """
         if cls._client_instance is None:
-            cls._client_instance = NacosConfigCenter(url=common_constants.NACOS_URL)
+            cls._client_instance = NacosConfigCenter()
         return cls._client_instance
 
     @staticmethod

@@ -13,23 +13,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import asyncio
 import fcntl
 import json
+import multiprocessing
 import os
 import pathlib
 import threading
-from typing import List
+from typing import List, Dict, Callable
 
 from nacos import NacosClient
 from nacos.timer import NacosTimer, NacosTimerManager
+from v2.nacos import NacosNamingService, ClientConfigBuilder, GRPCConfig, Instance, SubscribeServiceParam, \
+    RegisterInstanceParam, DeregisterInstanceParam, ListInstanceParam
 
+from dubbo.component.nacos_client import NacosClinet
 from dubbo.constants import common_constants, registry_constants
 from dubbo.loggers import loggerFactory
 from dubbo.registry import NotifyListener, Registry, RegistryFactory
 from dubbo.url import URL, create_url
 
 _LOGGER = loggerFactory.get_logger()
+
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+    _LOGGER.info("Using multiprocessing.set_start_method('spawn', force=True)")
+except RuntimeError:
+    _LOGGER. warning("Failed to set multiprocessing start method")
+
 
 DEFAULT_APPLICATION = common_constants.DEFAULT_SERVER_NAME
 

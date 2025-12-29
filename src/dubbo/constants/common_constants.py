@@ -49,6 +49,9 @@ SERVICE_HANDLER_KEY = os.environ.get("SERVICE_HANDLER_KEY", "service-handler")  
 # --- 服务分组 --- 
 GROUP_KEY = os.environ.get("GROUP_KEY", "group")  # 分组键名
 
+# --- 集群分组
+CLUSTER_KEY = os.environ.get("CLUSTER_KEY", "cluster")
+
 # --- 网络与端口设置 --- 
 LOCAL_HOST_KEY = os.environ.get("LOCAL_HOST_KEY", "localhost")  # 本地主机键名
 LOCAL_HOST_VALUE = os.environ.get("LOCAL_HOST_VALUE", "0.0.0.0")  # 本地主机默认值
