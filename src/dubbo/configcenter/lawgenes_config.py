@@ -86,7 +86,7 @@ class ConfigReloader:
         """
         config_name = self.config_name
         group = self.group
-        client = NacosConfigCenter(url=common_constants.NACOS_URL)
+        client = NacosConfigCenter()
         # 2. 定义配置变更监听器 (非阻塞订阅)
         try:
             # 异步地设置订阅，这个 await 应该会立即返回，而订阅任务在后台运行
