@@ -13,16 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncio
-from typing import Union
 
 # 移除旧的 nacos 客户端，并导入 v2 版本配置服务所需的类
-from v2.nacos import NacosConfigService, ClientConfigBuilder, GRPCConfig, ConfigParam
 
 from dubbo.component.nacos_client import NacosClinet
 from dubbo.configcenter._interfaces import Config
-from dubbo.constants import registry_constants
-from dubbo.url import create_url, URL
 
 __all__ = ["NacosConfigCenter"]
 

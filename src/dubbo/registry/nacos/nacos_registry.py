@@ -14,24 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import fcntl
-import json
 import multiprocessing
-import os
-import pathlib
+import queue
 import threading
-from typing import List, Dict, Callable
-
-from nacos import NacosClient
-from nacos.timer import NacosTimer, NacosTimerManager
-from v2.nacos import NacosNamingService, ClientConfigBuilder, GRPCConfig, Instance, SubscribeServiceParam, \
-    RegisterInstanceParam, DeregisterInstanceParam, ListInstanceParam
+from concurrent.futures import Future
 
 from dubbo.component.nacos_client import NacosClinet
-from dubbo.constants import common_constants, registry_constants
+from dubbo.constants import common_constants
 from dubbo.loggers import loggerFactory
-from dubbo.registry import NotifyListener, Registry, RegistryFactory
-from dubbo.url import URL, create_url
+from dubbo.registry import Registry, RegistryFactory
+from dubbo.url import URL
 
 _LOGGER = loggerFactory.get_logger()
 
@@ -44,231 +36,185 @@ except RuntimeError:
 
 DEFAULT_APPLICATION = common_constants.DEFAULT_SERVER_NAME
 
-__all__ = ["NacosRegistry", "NacosRegistryFactory"]
+__all__ = [
+    "NacosRegistryFactory"
+]
 
 
-class NacosSubscriber:
-    """
-    Nacos instance subscriber with local cache and file lock.
-    """
+class NacosRegistryV2:
+    def __init__(self, url):
+        self._url = url
+        # 关键修改：初始化时不立即创建实例，或者确保实例在后台线程初始化
+        self._nacos_client = None
 
-    def __init__(
-        self, nacos_client: NacosClient, service_name: str, listener: NotifyListener
-    ):
-        self._nacos_client = nacos_client
-        self._service_name = service_name
-        self._listener = listener
-        self._timer_manager = NacosTimerManager()
-        self._subscribed = False
-        self._urls = {}
-        # Define cache path: ~/.dubbo/nacos_cache/{service_name}.cache
-        cache_dir = pathlib.Path.home() / ".dubbo" / "nacos_cache"
-        try:
-            cache_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            _LOGGER.error("Failed to create nacos cache directory: %s", e)
+        # 任务队列：用于主线程与后台线程通信
+        self._task_queue = queue.Queue()
+        self._loop = None
+        self._loop_thread = None
+        self._stop_event = threading.Event()
+        self._loop_ready = threading.Event()
 
-        # Sanitize service name for filename
-        safe_service_name = service_name.replace(":", "_").replace("/", "_")
-        self._cache_file = cache_dir / f"{safe_service_name}.cache"
+        # 启动后台处理线程
+        self._start_background_worker()
 
-    def _save_to_local_cache(self, urls: List[URL]):
-        """Save instance URLs to local file with an exclusive lock."""
-        try:
-            url_data = [url.to_str() for url in urls]
-            with open(self._cache_file, "w", encoding="utf-8") as f:
-                # Apply an exclusive lock (blocking)
-                fcntl.flock(f, fcntl.LOCK_EX)
-                try:
-                    json.dump(url_data, f)
-                    f.flush()
-                    os.fsync(f.fileno())
-                finally:
-                    # Release the lock
-                    fcntl.flock(f, fcntl.LOCK_UN)
-        except Exception as e:
-            _LOGGER.warning("Failed to save local cache for %s: %s", self._service_name, e)
+        # 初始化 Nacos 客户端绑定
+        self._initialize_nacos_in_loop()
 
-    def _read_from_local_cache(self):
-        """Read instance URLs from local file with a shared lock."""
-        if not self._cache_file.exists():
-            return []
-        try:
-            with open(self._cache_file, "r", encoding="utf-8") as f:
-                # Apply a shared lock for reading
-                fcntl.flock(f, fcntl.LOCK_SH)
-                try:
-                    url_data = json.load(f)
-                    return [create_url(u) for u in url_data]
-                finally:
-                    # Release the lock
-                    fcntl.flock(f, fcntl.LOCK_UN)
-        except Exception as e:
-            _LOGGER.warning("Failed to read local cache for %s: %s", self._service_name, e)
-            return []
-
-    def _get_server_urls(self):
-        # Try to fetch from Nacos server
-        instances = self._nacos_client.list_naming_instance(self._service_name)
-        hosts = instances.get("hosts", [])
-
-        new_urls = [
-            URL(scheme="tri", host=h["ip"], port=h["port"])
-            for h in hosts
-            if h.get("enabled")
-        ]
-
-        # Success: update local cache and notify
-        self. _urls = new_urls
-        self._save_to_local_cache(new_urls)
-        self._listener.notify(urls=new_urls)
-
-    def refresh_instances(self):
-        """
-        Nocos > cache > local_cache
-        """
-        if not self._subscribed:
+    def _start_background_worker(self):
+        """启动后台线程，运行事件循环并消费队列任务"""
+        if self._loop_thread is not None and self._loop_thread.is_alive():
             return
 
-        try:
-            self._get_server_urls()
-        except Exception as e:
-            _LOGGER.error(
-                "Nacos server error for %s: %s. Falling back to local cache.",
-                self._service_name,
-                e,
-            )
-            if self._urls :
-                cached_urls = self._urls
-            else:
-                # Fallback: load from local cache if Nacos is down
-                cached_urls = self._read_from_local_cache()
-            if cached_urls:
-                self._listener.notify(urls=cached_urls)
+        def worker():
+            # 为后台线程创建私有事件循环
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
 
-    def subscribe(self):
-        if not self._timer_manager.all_timers().get("refresh_instances"):
-            self._timer_manager.add_timer(
-                NacosTimer("refresh_instances", self.refresh_instances, interval=7)
-            )
-            self._timer_manager.execute()
-        self._subscribed = True
-        # Initial refresh: also handled by exception catch
-        self.refresh_instances()
+            # 在 Loop 所在的线程内实例化 Nacos 客户端
+            # 确保其内部所有的异步组件（gRPC 等）都绑定到当前的 self._loop
+            self._nacos_client = NacosClinet()
 
-    def unsubscribe(self):
-        self._subscribed = False
+            self._loop_ready.set()
 
+            _LOGGER.info("Nacos Background Worker Thread started.")
 
-def _init_nacos_client(url: URL) -> NacosClient:
-    server_address = f"{url.host}:{url.port if url.port else 8848}"
-    parameters = url.parameters
+            # 定义一个内部处理器来消费队列
+            async def queue_processor():
+                while not self._stop_event.is_set():
+                    try:
+                        try:
+                            # 从队列获取任务请求
+                            item = self._task_queue.get(timeout=0.1)
+                            coro_func, args, kwargs, future = item
 
-    endpoint = parameters.get("endpoint")
-    namespace = parameters.get(registry_constants.NAMESPACE_KEY)
-    username = url.username
-    password = url.password
+                            try:
+                                # 执行协程任务
+                                result = await coro_func(*args, **kwargs)
+                                if future and not future.done():
+                                    future.set_result(result)
+                            except Exception as e:
+                                if future and not future.done():
+                                    future.set_exception(e)
+                                _LOGGER.error(f"Task execution error: {e}")
+                            finally:
+                                self._task_queue.task_done()
+                        except queue.Empty:
+                            continue
+                    except Exception as e:
+                        _LOGGER.error(f"Queue processor error: {e}")
 
-    return NacosClient(
-        server_addresses=server_address,
-        endpoint=endpoint,
-        namespace=namespace,
-        username=username,
-        password=password,
-    )
+                _LOGGER.info("Queue processor is shutting down.")
 
+            # 启动队列处理器并运行循环
+            try:
+                self._loop.run_until_complete(queue_processor())
+            finally:
+                self._loop.close()
+                _LOGGER.info("Nacos Background Loop closed.")
 
-def _build_nacos_service_name(url: URL):
-    service_name = url.parameters.get(common_constants.SERVICE_KEY)
-    return f"{registry_constants.PROVIDERS_CATEGORY}:{service_name}"
-
-
-class NacosRegistry(Registry):
-
-    def __init__(self, url: URL):
-        self._url = url
-        self._nacos_client: NacosClient = _init_nacos_client(url)
-        self._service_subscriber_mapping = {}
-
-    def _service_subscriber(
-        self, service_name: str, listener: NotifyListener
-    ) -> NacosSubscriber:
-        if service_name not in self._service_subscriber_mapping:
-            self._service_subscriber_mapping[service_name] = NacosSubscriber(
-                self._nacos_client, service_name=service_name, listener=listener
-            )
-
-        return self._service_subscriber_mapping[service_name]
-
-    def register(self, url: URL) -> None:
-        ip = url.host
-        port = url.port
-        nacos_service_name = _build_nacos_service_name(url)
-
-        metadata = common_constants.NACOS_METAINFO
-        try:
-            self._nacos_client.add_naming_instance(
-                nacos_service_name,
-                ip,
-                port,
-                DEFAULT_APPLICATION,
-                metadata=metadata,
-                heartbeat_interval=1,
-            )
-        except Exception as e:
-            _LOGGER.error("Failed to register to Nacos: %s", e)
-
-    def unregister(self, url: URL) -> None:
-        ip = url.host
-        port = url.port
-        nacos_service_name = _build_nacos_service_name(url)
-        try:
-            resp = self._nacos_client.remove_naming_instance(
-                nacos_service_name, ip=ip, port=port, cluster_name=DEFAULT_APPLICATION
-            )
-            _LOGGER.info(f"unregister: {ip}, {port}, {nacos_service_name}, {DEFAULT_APPLICATION}, {resp}")
-        except Exception as e:
-            _LOGGER.error("Failed to unregister from Nacos: %s", e)
-
-    def subscribe(self, url: URL, listener: NotifyListener) -> None:
-        nacos_service_name = _build_nacos_service_name(url)
-
-        subscriber = self._service_subscriber(nacos_service_name, listener)
-        _LOGGER.info("Subscribing to Nacos service in background: %s", nacos_service_name)
-
-        # Start a background thread to handle subscription tasks (initial refresh, timer setup)
-        # to avoid blocking the main execution flow if Nacos is slow or unreachable.
-        subscriber._get_server_urls()
-        subscribe_thread = threading.Thread(
-            target=subscriber.subscribe,
-            name=f"NacosSubscriberThread-{nacos_service_name}",
+        self._loop_thread = threading.Thread(
+            target=worker,
+            name="NacosRegistryWorker",
             daemon=True
         )
-        subscribe_thread.start()
+        self._loop_thread.start()
 
-    def unsubscribe(self, url: URL, listener: NotifyListener) -> None:
-        nacos_service_name = _build_nacos_service_name(url)
+        if not self._loop_ready.wait(timeout=5):
+            raise RuntimeError("Failed to start Nacos background worker thread.")
 
-        subscriber = self._service_subscriber(nacos_service_name, listener)
-        subscriber.unsubscribe()
-        listener.notify([])
+    def _initialize_nacos_in_loop(self):
+        """强制 Nacos 客户端在后台 Loop 中完成服务初始化"""
+        _LOGGER.info("Initializing Nacos client inside background worker...")
+        try:
+            # 提交初始化任务
+            if hasattr(self._nacos_client, 'start_init'):
+                self._run_via_queue(self._nacos_client.start_init)
+            else:
+                self._run_via_queue(asyncio.sleep, 0)
+        except Exception as e:
+            _LOGGER.error(f"Failed to initialize Nacos client: {e}")
 
-    def lookup(self, url: URL):
-        pass
+    def _run_via_queue(self, coro_func, *args, wait=True, **kwargs):
+        """
+        通过 Queue 提交任务请求。
+        注意：传入的是协程函数及其参数，而不是已经创建的协程对象，
+        以防止协程对象在错误的 Loop 线程中被预先实例化。
+        """
+        fut = Future()
+        # 传递函数引用而非协程实例
+        self._task_queue.put((coro_func, args, kwargs, fut))
 
-    def get_url(self) -> URL:
-        return self._url
+        if wait:
+            return fut.result()
+        return fut
 
-    def is_available(self) -> bool:
-        return self._nacos_client is not None
+    def register(self, url) -> None:
+        _LOGGER.info(f"V2 Registering service: {url.host}:{url.port}")
+        try:
+            self._run_via_queue(self._nacos_client.async_register_service, url)
+        except Exception as e:
+            _LOGGER.error(f"V2 Registration failed: {e}")
+
+    def unregister(self, url) -> None:
+        _LOGGER.info(f"V2 Unregistering service: {url.host}:{url.port}")
+        try:
+            self._run_via_queue(self._nacos_client.async_unregister_service, url)
+        except Exception as e:
+            _LOGGER.error(f"V2 Unregistration failed: {e}")
+
+    def subscribe(self, url, listener) -> None:
+        _LOGGER.info("V2 Subscribing to service via queue...")
+
+        def subscribe_callback(instances):
+            _LOGGER.info(f"V2 Received service notify: {len(instances)} instances")
+            pass
+
+        try:
+            # 提交订阅任务
+            self._run_via_queue(self._nacos_client.async_subscribe_service, subscribe_callback)
+            # 立即获取一次实例
+            self._run_via_queue(self._nacos_client.async_get_service)
+        except Exception as e:
+            _LOGGER.warning(f"V2 Subscription process failed: {e}")
+
+    def unsubscribe(self, url, listener) -> None:
+        _LOGGER.info("V2 Unsubscribing service")
+        try:
+            self._run_via_queue(self._nacos_client.async_unsubscribe_service, None)
+        except Exception as e:
+            _LOGGER.error(f"V2 Unsubscribe error: {e}")
+
+    def lookup(self, url):
+        try:
+            resp = self._run_via_queue(self._nacos_client.async_get_service)
+            hosts = resp.hosts if hasattr(resp, 'hosts') else []
+            return hosts
+        except Exception as e:
+            _LOGGER.error(f"V2 Lookup failed: {e}")
+            return []
 
     def destroy(self) -> None:
-        # stop all timers
-        pass
+        """安全停止后台线程和队列消费"""
+        _LOGGER.info("Destroying NacosRegistryV2 and stopping worker...")
+        try:
+            # 1. 执行清理
+            if self._nacos_client and hasattr(self._nacos_client, 'async_close_config'):
+                self._run_via_queue(self._nacos_client.async_close_config, wait=True)
 
+            # 2. 触发停止信号
+            self._stop_event.set()
 
+            # 3. 等待线程结束
+            if self._loop_thread:
+                self._loop_thread.join(timeout=2)
+        except Exception as e:
+            _LOGGER.error(f"Error during registry destruction: {e}")
+
+    def is_available(self) -> bool:
+        return not self._stop_event.is_set() and self._loop_thread is not None and self._loop_thread.is_alive()
 
 class NacosRegistryFactory(RegistryFactory):
 
     def get_registry(self, url: URL) -> Registry:
-        return NacosRegistry(url)
+        # return NacosRegistry(url)
+        return NacosRegistryV2(url)
