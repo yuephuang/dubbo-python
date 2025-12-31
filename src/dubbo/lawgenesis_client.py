@@ -51,7 +51,6 @@ class _InvokeClient:
         return f"tri://{ip}:{port}/{self.server_name}"
 
     def get_service(self, instances: List[Instance]=None):
-        print(f"get server:", instances)
         instances = instances or  self.nacos_client.get_service(server_name=self.server_name)
         urls = {}
         for instance in instances:
@@ -61,7 +60,6 @@ class _InvokeClient:
 
     def subscribe(self):
         def cb(instance_list: List[Instance]):
-            print("subscribe callback", instance_list)
             self.get_service(instance_list)
 
 
@@ -114,7 +112,6 @@ class LawgenesisClient:
             invoker.get_service()
             invoker.subscribe()
             self.__invoke_client[server_name] = invoker
-
 
         return self.__invoke_client[server_name]
 
