@@ -55,7 +55,10 @@ class _InvokeClient:
         urls = {}
         for instance in instances:
             key = self.server_key(instance.ip, instance.port)
-            urls[self.server_key(instance.ip, instance.port)] = DubboClient(reference=ReferenceConfig.from_url(url=create_url(key)))
+            if key in self._urls:
+                urls[key] = self._urls[key]
+                continue
+            urls[key] = DubboClient(reference=ReferenceConfig.from_url(url=create_url(key)))
         self._urls = urls
 
     def subscribe(self):
