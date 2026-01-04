@@ -112,15 +112,8 @@ class LawgenesisClient:
             invoker.get_service()
             invoker.subscribe()
             self.__invoke_client[server_name] = invoker
-
         return self.__invoke_client[server_name]
 
     async def async_invoke(self, server_name, method_name, request_data, client_config: LawClientConfig = None):
         invoke_client = self.select_invoke_client(server_name, client_config)
-        # 如果是异步环境，可以增加一个等待初始化的机制
         return await invoke_client.async_invoke(method_name, request_data)
-
-    # def invoke(self, server_name, method_name, request_data, client_config: LawClientConfig = None):
-    #     invoke_client = self.select_invoke_client(server_name, client_config)
-    #     # 如果是同步环境，可能需要短时间轮询等待初始化完成，或者直接调用（由 _urls 判空触发异常）
-    #     return invoke_client.invoke(method_name, request_data)
