@@ -47,10 +47,10 @@ SERVICE_KEY = os.environ.get("SERVICE_KEY", "service")  # 服务键名
 SERVICE_HANDLER_KEY = os.environ.get("SERVICE_HANDLER_KEY", "service-handler")  # 服务处理器键名
 
 # --- 服务分组 --- 
-GROUP_KEY = os.environ.get("GROUP_KEY", "group")  # 分组键名
+GROUP_KEY = os.environ.get("GROUP_KEY", "DEFAULT_GROUP")  # 分组键名
 
 # --- 集群分组
-CLUSTER_KEY = os.environ.get("CLUSTER_KEY", "cluster")
+CLUSTER_KEY = os.environ.get("CLUSTER_KEY", "DEFAULT")
 
 # --- 网络与端口设置 --- 
 LOCAL_HOST_KEY = os.environ.get("LOCAL_HOST_KEY", "localhost")  # 本地主机键名

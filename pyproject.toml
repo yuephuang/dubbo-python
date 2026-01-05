@@ -65,6 +65,7 @@ dependencies = [
     "redis==7.1.0",
     "aioredis[all]>=2.0.1",
     "httpx>=0.28.1",
+    "prometheus-client>=0.23.1",
 ]
 dynamic = ["version", "readme"]
 

@@ -84,11 +84,11 @@ class _InvokeClient:
 
     def invoke(self, method_name: str, request_data: any) -> lawgenesis_pb2.LawgenesisReply:
         metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
-        metadata.data_type = getattr(request_data, 'protobuf_type', 0)
+        metadata.data_type = request_data.protobuf_type
         metadata.auth = self.get_authorization()
 
         law_request = lawgenesis_pb2.LawgenesisRequest(
-            DATA=request_data.param2bytes if hasattr(request_data, 'param2bytes') else request_data.SerializeToString(),
+            DATA=request_data.param2bytes,
             BADA=metadata.basedata
         )
         return self.unary(method_name)(law_request)
