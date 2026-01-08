@@ -49,7 +49,6 @@ class Config(abc.ABC):
         """
         pass
 
-
     @abc.abstractmethod
     async def async_subscribe(self, config_name, group, listener):
         """
@@ -60,7 +59,6 @@ class Config(abc.ABC):
         :param: listener: 监听器
         """
         pass
-
 
     @abc.abstractmethod
     async def async_unsubscribe(self, config_name, group, listener):
@@ -81,7 +79,6 @@ class Config(abc.ABC):
         """
         pass
 
-
     def get_config(self, config_name: str, group: str):
         """
         get config
@@ -101,7 +98,7 @@ class Config(abc.ABC):
         """
         asyncio.run(self.async_publish_config(config_name, group, content))
 
-    def remove_config(self,  config_name: str, group: str):
+    def remove_config(self, config_name: str, group: str):
         """
         Remove config
         删除配置信息
@@ -109,7 +106,6 @@ class Config(abc.ABC):
         :param: group: 分组
         """
         asyncio.run(self.async_remove_config(config_name, group))
-
 
     def subscribe(self, config_name, group, listener):
         """
@@ -121,7 +117,6 @@ class Config(abc.ABC):
         """
         asyncio.run(self.async_subscribe(config_name, group, listener))
 
-
     def unsubscribe(self, config_name, group, listener):
         """
         Remove listener
@@ -131,7 +126,6 @@ class Config(abc.ABC):
         :param: listener: 监听器
         """
         asyncio.run(self.async_unsubscribe(config_name, group, listener))
-
 
     def close(self):
         """

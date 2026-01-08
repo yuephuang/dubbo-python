@@ -77,15 +77,13 @@ NACOS_METAINFO = {
     "GROUP_KEY": GROUP_KEY,
 }
 
-
 # redis 配置
 REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")  # Redis服务器主机
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))  # Redis服务器端口
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "123456")  # Redis密码
 REDIS_DB = int(os.environ.get("REDIS_DB", 0))  # Redis数据库索引
 
-
-# --- Prometheus监控配置 --- 
+# --- Prometheus监控配置 ---
 PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "")  # Prometheus Pushgateway URL
 
 # --- SSL配置 --- 
@@ -126,3 +124,6 @@ COMMA_SEPARATOR = os.environ.get("COMMA_SEPARATOR", ",")  # 逗号分隔符
 
 # other
 SERVER_THREAD_POOL_SIZE = int(os.environ.get("SERVER_THREAD_POOL_SIZE", 10))  # 服务器线程池大小
+
+# NOTIFY
+NOTIFY_URL = os.environ.get("NOTIFY_URL", "")

@@ -33,10 +33,10 @@ class Dubbo(SingletonBase):
     """
 
     def __init__(
-        self,
-        application_config: Optional[ApplicationConfig] = None,
-        registry_config: Optional[RegistryConfig] = None,
-        logger_config: Optional[LoggerConfig] = None,
+            self,
+            application_config: Optional[ApplicationConfig] = None,
+            registry_config: Optional[RegistryConfig] = None,
+            logger_config: Optional[LoggerConfig] = None,
     ):
         """
         Initialize a new Dubbo bootstrap.

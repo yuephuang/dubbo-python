@@ -33,12 +33,12 @@ class RpcInvocation(Invocation):
     ]
 
     def __init__(
-        self,
-        service_name: str,
-        method_name: str,
-        argument: Any,
-        attachments: Optional[dict[str, str]] = None,
-        attributes: Optional[dict[str, Any]] = None,
+            self,
+            service_name: str,
+            method_name: str,
+            argument: Any,
+            attachments: Optional[dict[str, str]] = None,
+            attributes: Optional[dict[str, Any]] = None,
     ):
         """
         Initialize a new RpcInvocation instance.

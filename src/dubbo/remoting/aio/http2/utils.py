@@ -38,7 +38,7 @@ class Http2EventUtils:
 
     @staticmethod
     def convert_to_frame(
-        event: h2_event.Event,
+            event: h2_event.Event,
     ) -> Union[HeadersFrame, DataFrame, RstStreamFrame, WindowUpdateFrame, PingFrame, None]:
         """
         Convert a h2.events.Event to HTTP/2 Frame.
@@ -48,12 +48,12 @@ class Http2EventUtils:
         :rtype: Union[HeadersFrame, DataFrame, RstStreamFrame, WindowUpdateFrame, PingFrame, None]
         """
         if isinstance(
-            event,
-            (
-                h2_event.RequestReceived,
-                h2_event.ResponseReceived,
-                h2_event.TrailersReceived,
-            ),
+                event,
+                (
+                        h2_event.RequestReceived,
+                        h2_event.ResponseReceived,
+                        h2_event.TrailersReceived,
+                ),
         ):
             # HEADERS frame.
             return HeadersFrame(

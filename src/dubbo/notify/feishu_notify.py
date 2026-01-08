@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
 from typing import List, Dict, Any
 
 from dubbo.notify._interface import NoticeFactory, ServerMetaData
@@ -23,6 +22,7 @@ class FeiShuNotify(NoticeFactory):
     """
     FeiShuNotify
     """
+
     @property
     def header(self):
         return {
@@ -58,50 +58,48 @@ class FeiShuNotify(NoticeFactory):
         }
         return await self.async_send_data(data)
 
-
     async def send_card(self, header: Dict[str, Any], body: List[Dict[str, Any]]):
         """
         发送卡片消息
         """
         data = {
-          "msg_type": "interactive",
-          "card": {
-            "schema": "2.0",
-            "config": {
-              "update_multi": True,
-              "style": {
-                "text_size": {
-                  "normal_v2": {
-                    "default": "normal",
-                    "pc": "normal",
-                    "mobile": "heading"
-                  }
-                }
-              }
-            },
-              "header": header,
-              "body": body
+            "msg_type": "interactive",
+            "card": {
+                "schema": "2.0",
+                "config": {
+                    "update_multi": True,
+                    "style": {
+                        "text_size": {
+                            "normal_v2": {
+                                "default": "normal",
+                                "pc": "normal",
+                                "mobile": "heading"
+                            }
+                        }
+                    }
+                },
+                "header": header,
+                "body": body
+            }
         }
-      }
         return await self.async_send_data(data)
 
-    async def async_send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
+    async def async_send_table(self, title="", subtitle="", elements: List[ServerMetaData] = None):
         """
         将json 数据变成表格发布
         """
         header = {
-          "title": {
-            "tag": "plain_text",
-            "content": title
-          },
-          "subtitle": {
-            "tag": "plain_text",
-            "content": subtitle
-          },
-          "template": "blue",
-          "padding": "12px 12px 12px 12px"
+            "title": {
+                "tag": "plain_text",
+                "content": title
+            },
+            "subtitle": {
+                "tag": "plain_text",
+                "content": subtitle
+            },
+            "template": "blue",
+            "padding": "12px 12px 12px 12px"
         }
-
 
         body = {
             "direction": "vertical",

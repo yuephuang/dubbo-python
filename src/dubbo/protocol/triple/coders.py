@@ -129,9 +129,9 @@ class TriDecoder:
     ]
 
     def __init__(
-        self,
-        listener: "TriDecoder.Listener",
-        decompressor: Optional[Decompressor],
+            self,
+            listener: "TriDecoder.Listener",
+            decompressor: Optional[Decompressor],
     ):
         """
         Initialize the decoder.
@@ -209,7 +209,7 @@ class TriDecoder:
         Processes the GRPC compression header which is composed of the compression flag and the outer frame length.
         """
         header_bytes = self._accumulate[: self._required_length]
-        self._accumulate = self._accumulate[self._required_length :]
+        self._accumulate = self._accumulate[self._required_length:]
 
         # Parse the header
         compressed_flag = int(header_bytes[0])
@@ -226,7 +226,7 @@ class TriDecoder:
         Processes the GRPC message body, which depending on frame header flags may be compressed.
         """
         payload_bytes = self._accumulate[: self._required_length]
-        self._accumulate = self._accumulate[self._required_length :]
+        self._accumulate = self._accumulate[self._required_length:]
 
         if self._compressed:
             # Decompress the payload

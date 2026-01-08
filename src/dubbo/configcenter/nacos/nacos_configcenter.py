@@ -21,10 +21,12 @@ from dubbo.configcenter._interfaces import Config
 
 __all__ = ["NacosConfigCenter"]
 
+
 class NacosConfigCenter(Config):
     """
     Nacos 配置中心实现，使用 v2.nacos.NacosConfigService
     """
+
     def __init__(self):
         self.nacos_client = NacosClinet()
 
@@ -73,7 +75,6 @@ class NacosConfigCenter(Config):
             group=group,
             listener=listener
         )
-
 
     async def async_close(self):
         """

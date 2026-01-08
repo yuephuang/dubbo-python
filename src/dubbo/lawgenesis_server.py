@@ -13,7 +13,6 @@
 import asyncio
 import datetime
 import os
-import subprocess
 import threading
 import time
 from contextlib import contextmanager
@@ -57,6 +56,7 @@ except Exception as e:
     _LOGGER.error(f"初始化 AsyncRpcCallable 失败: {e}")
     async_rpc_callable = None
 
+
 # --- 上下文管理器 ---
 @contextmanager
 def trace_context_manager(trace_id, context_id):
@@ -99,28 +99,11 @@ class LawgenesisService:
 
     @property
     def _intranet_ip(self) -> str:
-        try:
-            interface = "eth0"
-            command = f"ip route show dev {interface}"
-            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    text=True)
-            for line in result.stdout.strip().split('\n'):
-                if 'default via' in line:
-                    parts = line.split()
-                    return parts[2]
-            return f"在 '{interface}' 的路由表中未找到默认网关"
-        except Exception as e:
-            return f"未找到内网IP: {e}"
+        return self.law_server_config.host
 
     @property
     def _internet_ip(self) -> str:
-        try:
-            command = "curl ifconfig.me"
-            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    text=True)
-            return result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            return f"未找到公网IP: {e}"
+        return ""
 
     def _get_server_metadata(self) -> ServerMetaData:
         host_name = os.environ.get("HOSTNAME", "NOT HOSTNAME")
@@ -148,7 +131,7 @@ class LawgenesisService:
 
     @property
     def _server(self) -> Union[Server, Dubbo]:
-        service_config = ServiceConfig(service_handler=self._get_service_handler(), host=self.law_server_config.host,
+        service_config = ServiceConfig(service_handler=self._get_service_handler(), host="0.0.0.0",
                                        port=self.law_server_config.port)
         return Server(service_config)
 
@@ -266,7 +249,8 @@ class LawgenesisService:
             self._metrics_collector.register_metrics(method_name=method_name)
 
             # 异步执行器注册，这里需要确保 async_rpc_callable 能处理协程
-            async_rpc_callable.register_method(method_name=method_name, thread_num=1, method_instance=func)
+            if async_rpc_callable:
+                async_rpc_callable.register_method(method_name=method_name, thread_num=1, method_instance=func)
 
             _LOGGER.info(f"Method '{method_name}' registered (Async: {is_async_func})")
             return wrapper
@@ -321,7 +305,9 @@ class LawgenesisService:
         self._server.start()
         await self._notify_factory.async_send_table(title="🟢服务启动", subtitle=self.law_server_config.name,
                                                     elements=[self._get_server_metadata()])
-        async_rpc_callable.start_consumer()
+
+        if async_rpc_callable:
+            async_rpc_callable.start_consumer()
         try:
             self.nacos_register_client.register_service(
                 url=create_url(f"tri://{self.law_server_config.host}:{self.law_server_config.port}"))
@@ -347,9 +333,11 @@ class LawgenesisService:
         _LOGGER.info(f"Stopping Dubbo server: {self.law_server_config.name}...")
         self.nacos_register_client.unregister_service(
             url=create_url(f"tri://{self.law_server_config.host}:{self.law_server_config.port}"))
-        await asyncio.sleep(5)
         self.run = False
-        await self._notify_factory.async_send_table(title="🔴服务停止", subtitle=self.law_server_config.name,
+        await self._notify_factory.async_send_table(title="🔴服务开始停止", subtitle=self.law_server_config.name,
+                                                    elements=[self._get_server_metadata()])
+        await asyncio.sleep(300)
+        await self._notify_factory.async_send_table(title="🔴服务彻底停止", subtitle=self.law_server_config.name,
                                                     elements=[self._get_server_metadata()])
 
     def start(self):
@@ -357,8 +345,3 @@ class LawgenesisService:
             asyncio.run(self.async_start())
         except KeyboardInterrupt:
             _LOGGER.info("Exiting.")
-        finally:
-            self._server.stop()
-
-    def stop(self):
-        self.run = False

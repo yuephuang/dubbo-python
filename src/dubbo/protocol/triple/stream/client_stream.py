@@ -40,9 +40,9 @@ class TriClientStream(ClientStream):
     """
 
     def __init__(
-        self,
-        listener: ClientStream.Listener,
-        compressor: Optional[Compressor],
+            self,
+            listener: ClientStream.Listener,
+            compressor: Optional[Compressor],
     ):
         """
         Initialize the triple client stream.

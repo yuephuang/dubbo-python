@@ -1,6 +1,5 @@
 import asyncio
 import random
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List
 
@@ -39,7 +38,6 @@ class _InvokeClient:
 
     @property
     def client(self) -> DubboClient:
-        print(f"正在调用服务: {self._urls}")
         if not self._urls:
             _LOGGER.warning(f"服务 {self.server_name} 实例列表为空，可能正在初始化...")
             raise RuntimeError(f"No available instances found for server: {self.server_name}")
@@ -50,8 +48,8 @@ class _InvokeClient:
     def server_key(self, ip, port):
         return f"tri://{ip}:{port}/{self.server_name}"
 
-    def get_service(self, instances: List[Instance]=None):
-        instances = instances or  self.nacos_client.get_service(server_name=self.server_name)
+    def get_service(self, instances: List[Instance] = None):
+        instances = instances or self.nacos_client.get_service(server_name=self.server_name)
         urls = {}
         for instance in instances:
             key = self.server_key(instance.ip, instance.port)
@@ -65,8 +63,8 @@ class _InvokeClient:
         def cb(instance_list: List[Instance]):
             self.get_service(instance_list)
 
-
-        self.nacos_client.subscribe_service(server_name=self.server_name, group_name=common_constants.GROUP_KEY, listener=cb)
+        self.nacos_client.subscribe_service(server_name=self.server_name, group_name=common_constants.GROUP_KEY,
+                                            listener=cb)
 
     async def async_invoke(self, method_name: str, request_data: any) -> lawgenesis_pb2.LawgenesisReply:
         loop = asyncio.get_running_loop()
@@ -99,7 +97,6 @@ class _InvokeClient:
             request_serializer=lawgenesis_pb2.LawgenesisRequest.SerializeToString,
             response_deserializer=lawgenesis_pb2.LawgenesisReply.FromString,
         )
-
 
 
 class LawgenesisClient:

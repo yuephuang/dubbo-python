@@ -7,8 +7,8 @@
 @Description: 
 @Create Date: 2025/7/7 17:25
 """
+import threading  # <-- 导入 threading 模块
 from datetime import timedelta, datetime
-import threading # <-- 导入 threading 模块
 
 from cachetools import TLRUCache
 from pympler import asizeof
@@ -21,6 +21,7 @@ def datetime_ttu(_key, value, now):
     # value.hours to contain the item's time-to-use in hours
     return datetime + timedelta(seconds=value.hours)
 
+
 class LocalCacheClient:
     def __init__(self, cache_config: MethodCacheConfig):
         def dynamic_ttl(key, value, now):
@@ -29,20 +30,20 @@ class LocalCacheClient:
 
         self._cache = TLRUCache(maxsize=cache_config.cache_memory_size, ttu=dynamic_ttl,
                                 timer=datetime.now, getsizeof=asizeof.asizeof)
-        self._lock = threading.Lock() # <-- 创建一个锁
+        self._lock = threading.Lock()  # <-- 创建一个锁
 
     def get(self, cache_key: str):
-        with self._lock: # <-- 使用锁保护
+        with self._lock:  # <-- 使用锁保护
             return self._cache.get(cache_key, None)
 
     def set(self, cache_key: str, result):
-        with self._lock: # <-- 使用锁保护
+        with self._lock:  # <-- 使用锁保护
             self._cache[cache_key] = result
 
     def clear(self):
-        with self._lock: # <-- 使用锁保护
+        with self._lock:  # <-- 使用锁保护
             self._cache.clear()
 
     def delete_key(self, cache_key: str):
-        with self._lock: # <-- 使用锁保护
+        with self._lock:  # <-- 使用锁保护
             self._cache.pop(cache_key, None)

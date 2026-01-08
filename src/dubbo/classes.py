@@ -90,12 +90,12 @@ class MethodDescriptor:
     ]
 
     def __init__(
-        self,
-        method_name: str,
-        arg_serialization: tuple[Optional[SerializingFunction], Optional[DeserializingFunction]],
-        return_serialization: tuple[Optional[SerializingFunction], Optional[DeserializingFunction]],
-        rpc_type: Union[RpcType, RpcTypes, str] = RpcTypes.UNARY.value,
-        callable_method: Optional[Callable] = None,
+            self,
+            method_name: str,
+            arg_serialization: tuple[Optional[SerializingFunction], Optional[DeserializingFunction]],
+            return_serialization: tuple[Optional[SerializingFunction], Optional[DeserializingFunction]],
+            rpc_type: Union[RpcType, RpcTypes, str] = RpcTypes.UNARY.value,
+            callable_method: Optional[Callable] = None,
     ):
         """
         Initialize the method model.

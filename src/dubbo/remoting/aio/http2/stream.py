@@ -208,12 +208,12 @@ class DefaultHttp2Stream(Http2Stream):
     ]
 
     def __init__(
-        self,
-        stream_id: int,
-        listener: "Http2Stream.Listener",
-        loop: asyncio.AbstractEventLoop,
-        protocol,
-        executor: Optional[ThreadPoolExecutor] = None,
+            self,
+            stream_id: int,
+            listener: "Http2Stream.Listener",
+            loop: asyncio.AbstractEventLoop,
+            protocol,
+            executor: Optional[ThreadPoolExecutor] = None,
     ):
         # Avoid circular import
         from dubbo.remoting.aio.http2.controllers import (

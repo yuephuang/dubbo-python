@@ -75,10 +75,10 @@ class RemoteFlowController(Controller):
         event: Optional[asyncio.Event]
 
     def __init__(
-        self,
-        h2_connection: H2Connection,
-        transport: asyncio.Transport,
-        loop: asyncio.AbstractEventLoop,
+            self,
+            h2_connection: H2Connection,
+            transport: asyncio.Transport,
+            loop: asyncio.AbstractEventLoop,
     ):
         super().__init__(loop)
         self._h2_connection = h2_connection
@@ -149,7 +149,7 @@ class RemoteFlowController(Controller):
                 max_size = self._h2_connection.max_outbound_frame_size
                 # Split the data into chunks and send them out
                 for x in range(0, len(data_to_send), max_size):
-                    chunk = data_to_send[x : x + max_size]
+                    chunk = data_to_send[x: x + max_size]
                     end_stream_flag = item.end_stream and not data_to_buffer and (x + max_size >= len(data_to_send))
                     self._h2_connection.send_data(stream.id, chunk, end_stream=end_stream_flag)
 
@@ -180,11 +180,11 @@ class FrameInboundController(Controller):
     """
 
     def __init__(
-        self,
-        stream: Http2Stream,
-        loop: asyncio.AbstractEventLoop,
-        protocol,
-        executor: Optional[ThreadPoolExecutor] = None,
+            self,
+            stream: Http2Stream,
+            loop: asyncio.AbstractEventLoop,
+            protocol,
+            executor: Optional[ThreadPoolExecutor] = None,
     ):
         """
         Initialize the FrameInboundController.

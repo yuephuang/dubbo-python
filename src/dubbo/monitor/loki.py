@@ -112,7 +112,7 @@ class LokiEmitter(abc.ABC):
                 continue
 
             labels_key = tuple(sorted(labels_dict.items()))
-            
+
             if labels_key not in streams:
                 streams[labels_key] = {
                     "stream": labels_dict,

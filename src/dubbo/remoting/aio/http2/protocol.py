@@ -146,10 +146,10 @@ class AbstractHttp2Protocol(asyncio.Protocol, abc.ABC):
         self._loop.call_soon_threadsafe(_inner_operation, future)
 
     def send_frame(
-        self,
-        frame: UserActionFrames,
-        stream: Http2Stream,
-        event: Optional[asyncio.Event] = None,
+            self,
+            frame: UserActionFrames,
+            stream: Http2Stream,
+            event: Optional[asyncio.Event] = None,
     ) -> None:
         """
         Send the HTTP/2 frame.(thread-unsafe)
@@ -171,10 +171,10 @@ class AbstractHttp2Protocol(asyncio.Protocol, abc.ABC):
             _LOGGER.warning("Unhandled frame: %s", frame)
 
     def _send_headers_frame(
-        self,
-        frame: HeadersFrame,
-        stream: Http2Stream,
-        event: Optional[asyncio.Event] = None,
+            self,
+            frame: HeadersFrame,
+            stream: Http2Stream,
+            event: Optional[asyncio.Event] = None,
     ) -> None:
         """
         Send the HTTP/2 headers frame.(thread-unsafe)
@@ -302,9 +302,9 @@ class Http2ClientProtocol(AbstractHttp2Protocol):
     """
 
     def __init__(
-        self,
-        url: URL,
-        connection_listener: ConnectionStateListener = None,
+            self,
+            url: URL,
+            connection_listener: ConnectionStateListener = None,
     ):
         super().__init__(url, H2Configuration(client_side=True, header_encoding="utf-8"))
         self._connection_listener = connection_listener or EmptyConnectionStateListener()

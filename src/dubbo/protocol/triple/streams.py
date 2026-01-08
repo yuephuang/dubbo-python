@@ -204,9 +204,9 @@ class TriReadWriteStream(ReadWriteStream):
     __slots__ = ["_read_stream", "_write_stream"]
 
     def __init__(
-        self,
-        write_stream: Union[TriClientWriteStream, TriServerWriteStream],
-        read_stream: TriReadStream,
+            self,
+            write_stream: Union[TriClientWriteStream, TriServerWriteStream],
+            read_stream: TriReadStream,
     ):
         """
         Initialize the read write stream.

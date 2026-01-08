@@ -80,15 +80,15 @@ class URL:
     ]
 
     def __init__(
-        self,
-        scheme: str,
-        host: str,
-        port: Optional[int] = None,
-        username: str = "",
-        password: str = "",
-        path: str = "",
-        parameters: Optional[dict[str, str]] = None,
-        attributes: Optional[dict[str, Any]] = None,
+            self,
+            scheme: str,
+            host: str,
+            port: Optional[int] = None,
+            username: str = "",
+            password: str = "",
+            path: str = "",
+            parameters: Optional[dict[str, str]] = None,
+            attributes: Optional[dict[str, Any]] = None,
     ):
         """
         Initialize the URL object.
@@ -248,12 +248,12 @@ class URL:
         return self._attributes
 
     def to_str(
-        self,
-        contain_ip: bool = True,
-        contain_user: bool = True,
-        contain_path: bool = True,
-        contain_parameters: bool = True,
-        encode: bool = False,
+            self,
+            contain_ip: bool = True,
+            contain_user: bool = True,
+            contain_path: bool = True,
+            contain_parameters: bool = True,
+            encode: bool = False,
     ) -> str:
         """
         Converts the URL to a string.
@@ -321,14 +321,14 @@ class URL:
             return False
 
         return (
-            self.scheme == other.scheme
-            and self.host == other.host
-            and self.port == other.port
-            and self.username == other.username
-            and self.password == other.password
-            and self.path == other.path
-            and self.parameters == other.parameters
-            and self.attributes == other.attributes
+                self.scheme == other.scheme
+                and self.host == other.host
+                and self.port == other.port
+                and self.username == other.username
+                and self.password == other.password
+                and self.path == other.path
+                and self.parameters == other.parameters
+                and self.attributes == other.attributes
         )
 
     def __copy__(self) -> "URL":

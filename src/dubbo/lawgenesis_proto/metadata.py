@@ -13,13 +13,13 @@ from typing import Dict
 
 from dubbo.lawgenesis_proto import lawgenesis_pb2
 
+
 class LawAuthInfo:
     def __init__(self, auth: lawgenesis_pb2.Auth):
         self.auth = auth
 
     @property
     def auth_type(self):
-
         return self.auth.AUTY
 
     @property
@@ -29,6 +29,7 @@ class LawAuthInfo:
     @property
     def auth_key(self):
         return self.auth.ACKY
+
 
 class LawMetaData:
     def __init__(self, basedata: lawgenesis_pb2.BaseData):

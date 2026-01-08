@@ -22,6 +22,5 @@ CATEGORY_KEY = os.environ.get("CATEGORY_KEY", "category")
 PROVIDERS_CATEGORY = os.environ.get("PROVIDERS_CATEGORY", "providers")
 CONSUMERS_CATEGORY = os.environ.get("CONSUMERS_CATEGORY", "consumers")
 
-
 LOAD_BALANCE_KEY = os.environ.get("LOAD_BALANCE_KEY", "loadbalance")
 NAMESPACE_KEY = os.environ.get("NAMESPACE_KEY", "namespace")

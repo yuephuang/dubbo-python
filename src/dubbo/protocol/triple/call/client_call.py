@@ -44,11 +44,11 @@ class TripleClientCall(ClientCall, ClientStream.Listener):
     """
 
     def __init__(
-        self,
-        stream_factory: StreamClientMultiplexHandler,
-        listener: ClientCall.Listener,
-        serializer: Serializer,
-        deserializer: Deserializer,
+            self,
+            stream_factory: StreamClientMultiplexHandler,
+            listener: ClientCall.Listener,
+            serializer: Serializer,
+            deserializer: Deserializer,
     ):
         self._stream_factory = stream_factory
         self._client_stream: Optional[ClientStream] = None

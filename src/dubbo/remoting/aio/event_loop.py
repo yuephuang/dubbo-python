@@ -23,6 +23,7 @@ from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 
+
 class EventLoop:
     def __init__(self, in_other_tread: bool = True):
         self._in_other_tread = in_other_tread

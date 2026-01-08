@@ -50,7 +50,6 @@ from dubbo.utils import FunctionHelper
 
 __all__ = ["TripleInvoker"]
 
-
 _LOGGER = loggerFactory.get_logger()
 
 

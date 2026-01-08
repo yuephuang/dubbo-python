@@ -90,7 +90,8 @@ DEFAULT_CONSOLE_ENABLED_VALUE = os.environ.get("DEFAULT_CONSOLE_ENABLED_VALUE", 
 DEFAULT_FILE_ENABLED_VALUE = os.environ.get("DEFAULT_FILE_ENABLED_VALUE", "false").lower() == "true"  # 默认禁用文件日志
 DEFAULT_FILE_DIR_VALUE = os.environ.get("DEFAULT_FILE_DIR_VALUE", os.path.expanduser("~"))  # 默认日志文件目录（用户主目录）
 DEFAULT_FILE_NAME_VALUE = os.environ.get("DEFAULT_FILE_NAME_VALUE", "dubbo.log")  # 默认日志文件名
-DEFAULT_FILE_MAX_BYTES_VALUE = int(os.environ.get("DEFAULT_FILE_MAX_BYTES_VALUE", 10 * 1024 * 1024))  # 默认单日志文件最大大小（10MB）
+DEFAULT_FILE_MAX_BYTES_VALUE = int(
+    os.environ.get("DEFAULT_FILE_MAX_BYTES_VALUE", 10 * 1024 * 1024))  # 默认单日志文件最大大小（10MB）
 DEFAULT_FILE_INTERVAL_VALUE = int(os.environ.get("DEFAULT_FILE_INTERVAL_VALUE", 1))  # 默认日志轮换时间间隔
 DEFAULT_FILE_BACKUP_COUNT_VALUE = int(os.environ.get("DEFAULT_FILE_BACKUP_COUNT_VALUE", 10))  # 默认日志文件备份数量
 

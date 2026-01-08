@@ -142,8 +142,8 @@ class StreamServerMultiplexHandler(StreamMultiplexHandler):
     __slots__ = ["_listener_factory"]
 
     def __init__(
-        self,
-        listener_factory: Callable[[], Http2Stream.Listener],
+            self,
+            listener_factory: Callable[[], Http2Stream.Listener],
     ):
         super().__init__()
         self._listener_factory = listener_factory

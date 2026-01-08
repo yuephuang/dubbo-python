@@ -10,6 +10,7 @@ _LOGGER = loggerFactory.get_logger()
 
 NACOS_GROUP = f"{common_constants.DEFAULT_SERVER_NAME}_{common_constants.ENV_KEY}"
 
+
 class ConfigReloader:
     """
     配置重载器基类。
@@ -39,7 +40,6 @@ class ConfigReloader:
     def single_send():
         _LOGGER.info("Send single config")
 
-
     async def reload(self, tenant, data_id, group, content):
         """
         异步重载配置。
@@ -56,7 +56,6 @@ class ConfigReloader:
         self.update_cls(content)
         self.single_send()
 
-
     @classmethod
     def update_cls(cls, content):
         # 遍历配置字典，更新类实例属性
@@ -68,7 +67,6 @@ class ConfigReloader:
         except Exception as e:
             _LOGGER.error(f"Update config: {content}, failed: {e}")
 
-
     async def start_reloader(self):
         """
         启动配置重载器。如果没有配置
@@ -78,7 +76,6 @@ class ConfigReloader:
             self.update_cls(content)
         except Exception as e:
             _LOGGER.error(f"Get config: {self.config_name}, failed: {e}")
-
 
     async def async_start_reloader(self):
         """
@@ -101,7 +98,6 @@ class ConfigReloader:
             _LOGGER.error(f"Failed to subscribe to Nacos config: {config_name}/{group}. Error: {e}")
 
 
-
 class LawServerConfig(ConfigReloader):
     """
     服务配置类
@@ -115,6 +111,7 @@ class LawServerConfig(ConfigReloader):
     env = common_constants.ENV_KEY
     register_center_url = common_constants.NACOS_URL
     pushgateway_url = common_constants.PUSHGATEWAY_URL
+
 
 class LawClientConfig(ConfigReloader):
     """
@@ -149,6 +146,7 @@ class MethodCacheConfig:
         self.cache_ttl = cache_ttl
         self.cache_memory_size = cache_memory_size
 
+
 class MethodRetryConfig:
     """
     方法重试配置类
@@ -172,7 +170,9 @@ class RateLimitKeyConfig:
     RateLimitKeyConfig
     给每个key设置 不同的限流策略，如果没有，则默认为key
     """
-    def __init__(self, limits_enable=True, limits_strategies: str="fixed_window", limits_storge_amount: int=2, limits_storge_multiples: int=10):
+
+    def __init__(self, limits_enable=True, limits_strategies: str = "fixed_window", limits_storge_amount: int = 2,
+                 limits_storge_multiples: int = 10):
         """
         初始化一个 RateLimitKeyConfig 实例。
         注意，这个是针对某个用户或者某个使用方
@@ -185,6 +185,7 @@ class RateLimitKeyConfig:
         self.limits_strategies = limits_strategies
         self.limits_storge_amount = limits_storge_amount
         self.limits_storge_multiples = limits_storge_multiples
+
 
 class MethodRateLimitConfig:
     """
@@ -218,7 +219,8 @@ class MethodRateLimitConfig:
         self.limits_storge = limits_storge
 
         self.limits_storge_url = limits_storge_url
-        self.limits_storge_options = ast.literal_eval(limits_storge_options) if isinstance(limits_storge_options, str) else limits_storge_options
+        self.limits_storge_options = ast.literal_eval(limits_storge_options) if isinstance(limits_storge_options,
+                                                                                           str) else limits_storge_options
         self.limits_keys_operation: Dict[str, RateLimitKeyConfig] = {}
 
         for method_name, value in limits_keys_operation.items():
@@ -233,6 +235,7 @@ class MethodRateLimitConfig:
         """
         return hash((self.limits_enable, self.limits_storge, self.limits_storge_url,
                      self.limits_storge_options, self.limits_keys_operation))
+
 
 class LawMethodConfig(ConfigReloader):
     """
@@ -260,29 +263,29 @@ class LawMethodConfig(ConfigReloader):
             retry_interval=int(retry_item.get("retry_interval", 1000))
         )
 
-
     def rate_limit(self, method_name) -> MethodRateLimitConfig:
         limits_item = self._cache_config.get(method_name, {}).get("limits", {})
         return MethodRateLimitConfig(
             limits_enable=limits_item.get("limits_enable", False),
             limits_storge=limits_item.get("limits_storge", "memory"),
-            limits_storge_url = limits_item.get("limits_storge_url",  "127.0.0.1:6379"),
-            limits_storge_options = limits_item.get("limits_storge_options", {}),
-            limits_keys_operation = limits_item.get("limits_keys_operation", {})
+            limits_storge_url=limits_item.get("limits_storge_url", "127.0.0.1:6379"),
+            limits_storge_options=limits_item.get("limits_storge_options", {}),
+            limits_keys_operation=limits_item.get("limits_keys_operation", {})
         )
+
 
 class NotifyConfig(ConfigReloader):
     """
     The notify configuration.
     """
     config_name = f"{NACOS_GROUP}_notify.json"
-    url = ""
-
+    url = common_constants.NOTIFY_URL
 
 
 LAW_SERVER_CONFIG = LawServerConfig()
 METHOD_CONFIG = LawMethodConfig()
 NOTIFY_CONFIG = NotifyConfig()
+
 
 # 初次加载配置
 async def start_server_subscribe():
@@ -293,5 +296,6 @@ async def start_server_subscribe():
     await LAW_SERVER_CONFIG.start_reloader()
     await METHOD_CONFIG.start_reloader()
     await NOTIFY_CONFIG.start_reloader()
+
 
 asyncio.run(start_server_subscribe())

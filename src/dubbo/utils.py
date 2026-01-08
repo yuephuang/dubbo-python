@@ -188,7 +188,7 @@ class NetworkUtils:
                     if addr.family == socket.AF_INET:
                         # ignore the loopback address and check if the IP address is reachable
                         if not NetworkUtils.is_loopback_address(addr.address) and NetworkUtils.is_address_reachable(
-                            addr.address
+                                addr.address
                         ):
                             return addr.address
         except Exception:

@@ -17,8 +17,9 @@ import contextvars
 import enum
 import re
 import threading
-from typing import Optional
+
 from loguru import logger
+
 from dubbo.configs import LoggerConfig
 
 __all__ = ["loggerFactory"]
@@ -97,21 +98,21 @@ def format_record(record):
     """
     # Get trace_id from context vars
     record["extra"]["trace_id"] = TRACE_ID.get()
-    
+
     # Apply coloring based on level
     level_name = record["level"].name
     colors = ColorFormatter.COLOR_LEVEL_MAP
     record["level_color"] = colors.get(level_name, "")
     record["message_color"] = colors.get(level_name, "")
     record["end_color"] = ColorFormatter.Colors.END.value
-    
+
     # Handle suffix
     formatter = record["extra"].get("_formatter")
     if formatter:
         record["suffix"] = formatter.suffix
     else:
         record["suffix"] = ""
-        
+
     return record
 
 
@@ -145,7 +146,7 @@ class _LoggerFactory:
             # Remove all handlers if already configured
             if cls._logger_id is not None:
                 logger.remove(cls._logger_id)
-            
+
             config = cls._config
 
             # Add console handler if enabled
@@ -168,10 +169,10 @@ class _LoggerFactory:
         Add the console handler
         """
         config = cls._config
-        
+
         # Create formatter
         formatter = ColorFormatter(cls.DEFAULT_LOGGER_NAME)
-        
+
         # Add handler with custom format function
         cls._logger_id = logger.add(
             sink=lambda msg: print(msg, end=""),
@@ -186,10 +187,10 @@ class _LoggerFactory:
         Add the file handler
         """
         config = cls._config
-        
+
         # Create no-color formatter
         formatter = NoColorFormatter(cls.DEFAULT_LOGGER_NAME)
-        
+
         # Add handler with custom format function
         logger.add(
             sink=config.file_config.file_name,
@@ -205,15 +206,15 @@ class _LoggerFactory:
         Add the loki handler
         """
         config = cls._config
-        
+
         loki_uploader_handler = LokiQueueHandler(
             upload_url=config.get_loki_config().url,
             tags=config.get_loki_config().tag,
             auth=(config.get_loki_config().user, config.get_loki_config().password)
-                  if all((config.get_loki_config().user, config.get_loki_config().password))
-                  else None,
+            if all((config.get_loki_config().user, config.get_loki_config().password))
+            else None,
         )
-        
+
         # Add handler for Loki
         logger.add(
             sink=loki_uploader_handler,
@@ -249,7 +250,7 @@ class LoggerAdapter:
     """
     Adapter to make loguru logger compatible with the previous logging.Logger interface
     """
-    
+
     def __init__(self, name: str):
         self.name = name
         self._logger = logger.bind(name=name)
@@ -258,32 +259,32 @@ class LoggerAdapter:
         # Handle args formatting
         if args:
             msg = msg % args
-            
+
         # Add trace_id to log context
         trace_id = TRACE_ID.get()
         context_id = CONTEXT_ID.get()
-        
+
         # Bind extra context
         log = self._logger.bind(trace_id=trace_id)
-        
+
         # Log with appropriate level
         log.log(level.upper(), msg)
-            
+
     def debug(self, msg, *args, **kwargs):
         self._log("DEBUG", msg, *args, **kwargs)
-        
+
     def info(self, msg, *args, **kwargs):
         self._log("INFO", msg, *args, **kwargs)
-        
+
     def warning(self, msg, *args, **kwargs):
         self._log("WARNING", msg, *args, **kwargs)
-        
+
     def error(self, msg, *args, **kwargs):
         self._log("ERROR", msg, *args, **kwargs)
-        
+
     def critical(self, msg, *args, **kwargs):
         self._log("CRITICAL", msg, *args, **kwargs)
-        
+
     def setLevel(self, level):
         # Loguru handles levels differently, this is just for compatibility
         pass

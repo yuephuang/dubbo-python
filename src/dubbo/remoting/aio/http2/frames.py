@@ -38,10 +38,10 @@ class Http2Frame:
     __slots__ = ["stream_id", "frame_type", "end_stream", "timestamp"]
 
     def __init__(
-        self,
-        stream_id: int,
-        frame_type: Http2FrameType,
-        end_stream: bool = False,
+            self,
+            stream_id: int,
+            frame_type: Http2FrameType,
+            end_stream: bool = False,
     ):
         """
         Initialize the HTTP/2 frame.
@@ -68,10 +68,10 @@ class HeadersFrame(Http2Frame):
     __slots__ = ["headers"]
 
     def __init__(
-        self,
-        stream_id: int,
-        headers: Http2Headers,
-        end_stream: bool = False,
+            self,
+            stream_id: int,
+            headers: Http2Headers,
+            end_stream: bool = False,
     ):
         """
         Initialize the HTTP/2 headers frame.
@@ -99,11 +99,11 @@ class DataFrame(Http2Frame):
     __slots__ = ["data", "padding"]
 
     def __init__(
-        self,
-        stream_id: int,
-        data: bytes,
-        length: int,
-        end_stream: bool = False,
+            self,
+            stream_id: int,
+            data: bytes,
+            length: int,
+            end_stream: bool = False,
     ):
         """
         Initialize the HTTP/2 data frame.
@@ -131,9 +131,9 @@ class WindowUpdateFrame(Http2Frame):
     __slots__ = ["delta"]
 
     def __init__(
-        self,
-        stream_id: int,
-        delta: int,
+            self,
+            stream_id: int,
+            delta: int,
     ):
         """
         Initialize the HTTP/2 window update frame.
@@ -157,9 +157,9 @@ class RstStreamFrame(Http2Frame):
     __slots__ = ["error_code"]
 
     def __init__(
-        self,
-        stream_id: int,
-        error_code: Http2ErrorCode,
+            self,
+            stream_id: int,
+            error_code: Http2ErrorCode,
     ):
         """
         Initialize the HTTP/2 reset stream frame.

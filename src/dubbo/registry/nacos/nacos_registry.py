@@ -31,8 +31,7 @@ try:
     multiprocessing.set_start_method('spawn', force=True)
     _LOGGER.info("Using multiprocessing.set_start_method('spawn', force=True)")
 except RuntimeError:
-    _LOGGER. warning("Failed to set multiprocessing start method")
-
+    _LOGGER.warning("Failed to set multiprocessing start method")
 
 DEFAULT_APPLICATION = common_constants.DEFAULT_SERVER_NAME
 
@@ -212,6 +211,7 @@ class NacosRegistryV2:
 
     def is_available(self) -> bool:
         return not self._stop_event.is_set() and self._loop_thread is not None and self._loop_thread.is_alive()
+
 
 class NacosRegistryFactory(RegistryFactory):
 

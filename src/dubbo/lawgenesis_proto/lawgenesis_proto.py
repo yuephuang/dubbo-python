@@ -5,7 +5,7 @@ import orjson
 
 
 class ProtobufInterface:
-    def __init__(self, json: dict=None):
+    def __init__(self, json: dict = None):
         """
         Args:
             json:
@@ -16,6 +16,7 @@ class ProtobufInterface:
         if not isinstance(self._json, dict):
             raise TypeError("json must be dict")
         self._key = None
+
     @property
     def protobuf_type(self):
         return "base"
@@ -82,7 +83,6 @@ class ProtobufInterface:
         return orjson.dumps(send_data)
 
 
-
 class LLMProtobuf(ProtobufInterface):
     @property
     def protobuf_type(self):
@@ -106,6 +106,7 @@ class LLMProtobuf(ProtobufInterface):
             "contextId": self.context_id,
         }
 
+
 class TxtProtobuf(ProtobufInterface):
     @property
     def protobuf_type(self):
@@ -118,6 +119,7 @@ class TxtProtobuf(ProtobufInterface):
             "contextId": self.context_id,
             "cmdParams": self.cmd_params,
         }
+
 
 class FileListStruct(object):
     def __init__(self, file_struct: dict):
@@ -143,6 +145,7 @@ class FileListStruct(object):
             "extraInfo": self.extraInfo,
         }
 
+
 class FileProtobuf(ProtobufInterface):
     @property
     def protobuf_type(self):
@@ -165,8 +168,9 @@ class FileProtobuf(ProtobufInterface):
             "cmdParams": self.cmd_params,
         }
 
+
 class ResponseProto:
-    def __init__(self, data: Any=None, context_id: str="", code=None):
+    def __init__(self, data: Any = None, context_id: str = "", code=None):
         self._data = data
         self._context_id = context_id
         self._code = code

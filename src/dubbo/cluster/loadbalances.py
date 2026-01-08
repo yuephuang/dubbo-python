@@ -26,6 +26,7 @@ from dubbo.protocol import Invocation, Invoker
 
 _LOGGER = loggerFactory.get_logger()
 
+
 class AbstractLoadBalance(LoadBalance, abc.ABC):
     """
     The abstract load balance.
@@ -171,7 +172,6 @@ class ConsistentHashLoadBalance(AbstractLoadBalance):
         """
         return set(invoker.get_url().to_str() for invoker in invokers) == self._cached_invokers
 
-
     def do_select(self, invokers: list[Invoker], invocation: Invocation) -> Optional[Invoker]:
         """
         根据请求参数选择一个 Invoker。
@@ -203,6 +203,3 @@ class ConsistentHashLoadBalance(AbstractLoadBalance):
 
         target_hash = self._sorted_hashes[idx]
         return self._hash_ring[target_hash]
-
-
-

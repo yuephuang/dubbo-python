@@ -5,14 +5,15 @@ from typing import Callable
 
 import httpx
 
+from dubbo.component.redis_client import RedisClient
 from dubbo.constants import common_constants
 from dubbo.loggers import loggerFactory
-from dubbo.component.redis_client import RedisClient
 
 # 配置日志
 _LOGGER = loggerFactory.get_logger()
 
 cls_method_config = {}
+
 
 class AsyncRpcCallable:
     """

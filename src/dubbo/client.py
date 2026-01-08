@@ -83,10 +83,10 @@ class Client:
             self._initialized = True
 
     def unary(
-        self,
-        method_name: str,
-        request_serializer: Optional[SerializingFunction] = None,
-        response_deserializer: Optional[DeserializingFunction] = None,
+            self,
+            method_name: str,
+            request_serializer: Optional[SerializingFunction] = None,
+            response_deserializer: Optional[DeserializingFunction] = None,
     ) -> RpcCallable:
         return self._callable(
             MethodDescriptor(
@@ -98,10 +98,10 @@ class Client:
         )
 
     def client_stream(
-        self,
-        method_name: str,
-        request_serializer: Optional[SerializingFunction] = None,
-        response_deserializer: Optional[DeserializingFunction] = None,
+            self,
+            method_name: str,
+            request_serializer: Optional[SerializingFunction] = None,
+            response_deserializer: Optional[DeserializingFunction] = None,
     ) -> RpcCallable:
         return self._callable(
             MethodDescriptor(
@@ -113,10 +113,10 @@ class Client:
         )
 
     def server_stream(
-        self,
-        method_name: str,
-        request_serializer: Optional[SerializingFunction] = None,
-        response_deserializer: Optional[DeserializingFunction] = None,
+            self,
+            method_name: str,
+            request_serializer: Optional[SerializingFunction] = None,
+            response_deserializer: Optional[DeserializingFunction] = None,
     ) -> RpcCallable:
         return self._callable(
             MethodDescriptor(
@@ -128,10 +128,10 @@ class Client:
         )
 
     def bi_stream(
-        self,
-        method_name: str,
-        request_serializer: Optional[SerializingFunction] = None,
-        response_deserializer: Optional[DeserializingFunction] = None,
+            self,
+            method_name: str,
+            request_serializer: Optional[SerializingFunction] = None,
+            response_deserializer: Optional[DeserializingFunction] = None,
     ) -> RpcCallable:
         # create method descriptor
         return self._callable(

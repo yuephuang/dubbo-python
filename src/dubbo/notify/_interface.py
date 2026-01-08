@@ -26,10 +26,14 @@ from dubbo.loggers import loggerFactory
 
 _LOGGER = loggerFactory.get_logger()
 
+_SERVER_ID = uuid.uuid4().hex
+
+
 class ServerMetaData(object):
     """
     服务状态数据
     """
+
     def __init__(self, server_name, host, host_name, intranet_ip, internet_ip, message, start_time):
         self.server_name = server_name
         self.host = host
@@ -38,7 +42,6 @@ class ServerMetaData(object):
         self.internet_ip = internet_ip
         self.message = message
         self.start_time = start_time
-        self.uuid = uuid.uuid4().hex
 
     @property
     def json(self):
@@ -50,7 +53,7 @@ class ServerMetaData(object):
             "internet_ip": self.internet_ip,
             "message": self.message,
             "start_time": self.start_time,
-            "uuid": self.uuid
+            "uuid": _SERVER_ID
         }
 
 
@@ -73,7 +76,7 @@ class NoticeFactory(ABC):
                 cls._instance[kwargs.get("url")] = super().__new__(cls)
         return cls._instance[kwargs.get("url")]
 
-    def __init__(self, url: str=None, header: Dict[str, str] = None, server_name: str="dubbo-server"):
+    def __init__(self, url: str = None, header: Dict[str, str] = None, server_name: str = "dubbo-server"):
         """
         Initialize the notice.
         :param url: The url of the notice.
@@ -149,7 +152,6 @@ class NoticeFactory(ABC):
         """
         self._timeout = timeout
 
-
     async def async_send_data(self, content: dict):
         try:
             async with ClientSession() as session:
@@ -179,8 +181,7 @@ class NoticeFactory(ABC):
 
         """
 
-
-    async def async_send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
+    async def async_send_table(self, title="", subtitle="", elements: List[ServerMetaData] = None):
         """
         Send data to the notice.
         :param title: The title of the notice.
@@ -206,7 +207,7 @@ class NoticeFactory(ABC):
         """
         asyncio.run(self.async_send_rich_text(title, content))
 
-    def send_table(self, title="", subtitle="", elements: List[ServerMetaData] =None):
+    def send_table(self, title="", subtitle="", elements: List[ServerMetaData] = None):
         """
         Send data to the notice.
         :param title: The title of the notice.

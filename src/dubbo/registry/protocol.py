@@ -72,6 +72,3 @@ class RegistryProtocol(Protocol):
 
         ref_url: URL = url.attributes[common_constants.EXPORT_KEY]
         registry.unregister(ref_url)
-
-
-

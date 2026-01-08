@@ -50,10 +50,10 @@ _LOGGER = loggerFactory.get_logger()
 
 class TripleServerCall(ServerCall, ServerStream.Listener):
     def __init__(
-        self,
-        server_stream: ServerStream,
-        method_handler: RpcMethodHandler,
-        executor: ThreadPoolExecutor,
+            self,
+            server_stream: ServerStream,
+            method_handler: RpcMethodHandler,
+            executor: ThreadPoolExecutor,
     ):
         self._server_stream = server_stream
         self._executor = executor
@@ -154,10 +154,10 @@ class DefaultMethodRunner(MethodRunner):
     """
 
     def __init__(
-        self,
-        func: Callable,
-        read_write_stream: ReadWriteStream,
-        rpc_type: RpcType,
+            self,
+            func: Callable,
+            read_write_stream: ReadWriteStream,
+            rpc_type: RpcType,
     ):
         self._read_write_stream = read_write_stream
         self._func = func

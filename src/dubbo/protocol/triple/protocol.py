@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import functools
-import os
 import uuid
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -70,8 +69,9 @@ class TripleProtocol(Protocol):
         else:
             self._path_resolver[service_handler.service_name] = service_handler
 
-        method_executor = ThreadPoolExecutor(thread_name_prefix=f"{common_constants.DEFAULT_SERVER_NAME}_{uuid.uuid4().hex[:8]}",
-                                             max_workers=common_constants.SERVER_THREAD_POOL_SIZE)
+        method_executor = ThreadPoolExecutor(
+            thread_name_prefix=f"{common_constants.DEFAULT_SERVER_NAME}_{uuid.uuid4().hex[:8]}",
+            max_workers=common_constants.SERVER_THREAD_POOL_SIZE)
 
         listener_factory = functools.partial(ServerTransportListener, self._path_resolver, method_executor)
 

@@ -13,6 +13,7 @@ from dubbo.url import create_url, URL
 
 _LOGGER = logging.getLogger()
 
+
 class NacosClinet(SingletonBase):
     _loop: asyncio.AbstractEventLoop = None
     _thread: threading.Thread = None

@@ -1,4 +1,3 @@
-import abc
 from abc import ABC
 from datetime import timedelta
 from typing import Dict
@@ -12,7 +11,8 @@ class RataLimitFactory(ABC):
     """
     RataLimitFactory
     """
-    def __init__(self, limit_config: Dict[str, RateLimitKeyConfig], server: str="", options: Dict=None):
+
+    def __init__(self, limit_config: Dict[str, RateLimitKeyConfig], server: str = "", options: Dict = None):
         self.limit_config = limit_config
         self.server = server
         self.options = options
@@ -34,13 +34,12 @@ class RataLimitFactory(ABC):
             else:
                 self.limit_client[key] = self.fixed_window(value.limits_storge_amount, value.limits_storge_multiples)
 
-
     def fixed_window(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
         return Throttled(
             store=self.store(),
             using=RateLimiterType.FIXED_WINDOW.value,
             quota=self.quate(limits_storge_amount, limits_storge_multiples),
-            )
+        )
 
     def sliding_window(self, limits_storge_amount: int, limits_storge_multiples: int) -> Throttled:
         return Throttled(
@@ -69,7 +68,6 @@ class RataLimitFactory(ABC):
             using=RateLimiterType.LEAKING_BUCKET.value,
             quota=self.quate(limits_storge_amount, limits_storge_multiples),
         )
-
 
     def limit(self, key: str) -> RateLimitResult:
         throttled_client = self.limit_client.get(key)

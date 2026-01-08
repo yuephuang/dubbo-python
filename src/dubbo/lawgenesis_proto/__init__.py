@@ -10,4 +10,5 @@
 from .lawgenesis_proto import LLMProtobuf, FileProtobuf, TxtProtobuf, ProtobufInterface, ResponseProto
 from .metadata import LawMetaData, LawAuthInfo
 
-__all__ = ["LLMProtobuf", "FileProtobuf", "TxtProtobuf", "ProtobufInterface", "LawMetaData", "LawAuthInfo", "ResponseProto"]
+__all__ = ["LLMProtobuf", "FileProtobuf", "TxtProtobuf", "ProtobufInterface", "LawMetaData", "LawAuthInfo",
+           "ResponseProto"]

@@ -7,6 +7,7 @@ class RedisLimit(RataLimitFactory):
     """
     RedisLimit
     """
+
     def store(self):
         return store.RedisStore(
             server=self.server,

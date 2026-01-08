@@ -126,9 +126,9 @@ class ServerTransportListener(Http2Stream.Listener):
     """
 
     def __init__(
-        self,
-        service_handles: dict[str, RpcServiceHandler],
-        method_executor: ThreadPoolExecutor,
+            self,
+            service_handles: dict[str, RpcServiceHandler],
+            method_executor: ThreadPoolExecutor,
     ):
         super().__init__()
         self._listener: Optional[ServerStream.Listener] = None

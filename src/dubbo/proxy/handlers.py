@@ -52,11 +52,11 @@ class RpcMethodHandler:
 
     @classmethod
     def unary(
-        cls,
-        method: Callable,
-        method_name: Optional[str] = None,
-        request_deserializer: Optional[DeserializingFunction] = None,
-        response_serializer: Optional[SerializingFunction] = None,
+            cls,
+            method: Callable,
+            method_name: Optional[str] = None,
+            request_deserializer: Optional[DeserializingFunction] = None,
+            response_serializer: Optional[SerializingFunction] = None,
     ) -> "RpcMethodHandler":
         """
         Create a unary method handler
@@ -83,11 +83,11 @@ class RpcMethodHandler:
 
     @classmethod
     def client_stream(
-        cls,
-        method: Callable,
-        method_name: Optional[str] = None,
-        request_deserializer: Optional[DeserializingFunction] = None,
-        response_serializer: Optional[SerializingFunction] = None,
+            cls,
+            method: Callable,
+            method_name: Optional[str] = None,
+            request_deserializer: Optional[DeserializingFunction] = None,
+            response_serializer: Optional[SerializingFunction] = None,
     ):
         """
         Create a client stream method handler
@@ -114,11 +114,11 @@ class RpcMethodHandler:
 
     @classmethod
     def server_stream(
-        cls,
-        method: Callable,
-        method_name: Optional[str] = None,
-        request_deserializer: Optional[DeserializingFunction] = None,
-        response_serializer: Optional[SerializingFunction] = None,
+            cls,
+            method: Callable,
+            method_name: Optional[str] = None,
+            request_deserializer: Optional[DeserializingFunction] = None,
+            response_serializer: Optional[SerializingFunction] = None,
     ):
         """
         Create a server stream method handler
@@ -145,11 +145,11 @@ class RpcMethodHandler:
 
     @classmethod
     def bi_stream(
-        cls,
-        method: Callable,
-        method_name: Optional[str] = None,
-        request_deserializer: Optional[DeserializingFunction] = None,
-        response_serializer: Optional[SerializingFunction] = None,
+            cls,
+            method: Callable,
+            method_name: Optional[str] = None,
+            request_deserializer: Optional[DeserializingFunction] = None,
+            response_serializer: Optional[SerializingFunction] = None,
     ):
         """
         Create a bidi stream method handler

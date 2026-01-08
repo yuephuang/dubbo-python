@@ -1,4 +1,3 @@
-
 from typing import Optional, Union
 
 import redis
@@ -16,17 +15,17 @@ class AsyncRedisClient:
     """
 
     def __init__(
-        self,
-        nodes: Optional[Union[str, list]] = None,
-        *,
-        host: str = "localhost",
-        port: int = 6379,
-        db: int = 0,
-        password: Optional[str] = None,
-        socket_timeout: int = 5,
-        decode_responses: bool = True,
-        startup_nodes: Optional[list] = None,
-        skip_full_coverage_check: bool = True,
+            self,
+            nodes: Optional[Union[str, list]] = None,
+            *,
+            host: str = "localhost",
+            port: int = 6379,
+            db: int = 0,
+            password: Optional[str] = None,
+            socket_timeout: int = 5,
+            decode_responses: bool = True,
+            startup_nodes: Optional[list] = None,
+            skip_full_coverage_check: bool = True,
     ):
         """
         初始化 Redis 异步客户端。
@@ -73,13 +72,13 @@ class AsyncRedisClient:
             self.mode = "standalone"
 
     async def set(
-        self,
-        key: str,
-        value: str,
-        ex: Optional[int] = None,
-        px: Optional[int] = None,
-        nx: bool = False,
-        xx: bool = False,
+            self,
+            key: str,
+            value: str,
+            ex: Optional[int] = None,
+            px: Optional[int] = None,
+            nx: bool = False,
+            xx: bool = False,
     ) -> bool:
         """
         增强版 SET 命令，支持 EX/PX/NX/XX 参数。
@@ -112,6 +111,7 @@ class AsyncRedisClient:
         """
         await self.r.close()
 
+
 class RedisClient:
     """
     支持单机模式和集群模式的 Redis 客户端封装。
@@ -119,17 +119,17 @@ class RedisClient:
     """
 
     def __init__(
-        self,
-        nodes: Optional[Union[str, list]] = None,
-        *,
-        host: str = common_constants.REDIS_HOST,
-        port: int = common_constants.REDIS_PORT,
-        db: int = common_constants.REDIS_DB,
-        password: Optional[str] = common_constants.REDIS_PASSWORD,
-        socket_timeout: int = 5,
-        decode_responses: bool = True,
-        startup_nodes: Optional[list] = None,
-        skip_full_coverage_check: bool = True,
+            self,
+            nodes: Optional[Union[str, list]] = None,
+            *,
+            host: str = common_constants.REDIS_HOST,
+            port: int = common_constants.REDIS_PORT,
+            db: int = common_constants.REDIS_DB,
+            password: Optional[str] = common_constants.REDIS_PASSWORD,
+            socket_timeout: int = 5,
+            decode_responses: bool = True,
+            startup_nodes: Optional[list] = None,
+            skip_full_coverage_check: bool = True,
     ):
         """
         初始化 Redis 客户端。
@@ -176,13 +176,13 @@ class RedisClient:
             self.mode = "standalone"
 
     def set(
-        self,
-        key: str,
-        value: str,
-        ex: Optional[int] = None,
-        px: Optional[int] = None,
-        nx: bool = False,
-        xx: bool = False,
+            self,
+            key: str,
+            value: str,
+            ex: Optional[int] = None,
+            px: Optional[int] = None,
+            nx: bool = False,
+            xx: bool = False,
     ) -> bool:
         """
         增强版 SET 命令，支持 EX/PX/NX/XX 参数。

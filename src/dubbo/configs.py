@@ -42,6 +42,7 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class ConfigReloader(abc.ABC):
     """
     配置重载器基类。

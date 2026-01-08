@@ -29,10 +29,10 @@ class TriRpcStatus:
     __slots__ = ["_code", "_cause", "_description"]
 
     def __init__(
-        self,
-        code: GRpcCode,
-        cause: Optional[Exception] = None,
-        description: Optional[str] = None,
+            self,
+            code: GRpcCode,
+            cause: Optional[Exception] = None,
+            description: Optional[str] = None,
     ):
         """
         Initialize the RPC status.

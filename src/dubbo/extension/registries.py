@@ -20,11 +20,11 @@ from typing import Any
 from dubbo.cluster import LoadBalance
 from dubbo.compression import Compressor, Decompressor
 from dubbo.configcenter import Config
+from dubbo.lawgenesis_proto import ProtobufInterface
 from dubbo.notify import NoticeFactory
 from dubbo.protocol import Protocol
 from dubbo.registry import RegistryFactory
 from dubbo.remoting import Transporter
-from dubbo.lawgenesis_proto import ProtobufInterface
 
 
 @dataclass
@@ -92,7 +92,6 @@ compressorRegistry = ExtendedRegistry(
     },
 )
 
-
 # Decompressor registry
 decompressorRegistry = ExtendedRegistry(
     interface=Decompressor,
@@ -102,7 +101,6 @@ decompressorRegistry = ExtendedRegistry(
         "bzip2": "dubbo.compression.Bzip2",
     },
 )
-
 
 # Transporter registry
 transporterRegistry = ExtendedRegistry(
@@ -128,12 +126,11 @@ notifyFactoryRegistry = ExtendedRegistry(
     },
 )
 
-
 lawgenesisProtoRegisty = ExtendedRegistry(
     interface=ProtobufInterface,
     impls={
-    "txt": "dubbo.lawgenesis_proto.TxtProtobuf",
-    "llm": "dubbo.lawgenesis_proto.LLMProtobuf",
-    "file": "dubbo.lawgenesis_proto.FileProtobuf",
+        "txt": "dubbo.lawgenesis_proto.TxtProtobuf",
+        "llm": "dubbo.lawgenesis_proto.LLMProtobuf",
+        "file": "dubbo.lawgenesis_proto.FileProtobuf",
     },
 )
