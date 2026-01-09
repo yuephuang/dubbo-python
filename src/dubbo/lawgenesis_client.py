@@ -16,7 +16,6 @@ from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto import lawgenesis_pb2, LawMetaData
 from dubbo.loggers import loggerFactory
 from dubbo.notify import NoticeFactory, ServerMetaData
-from dubbo.url import create_url
 
 DEFAULT_MAX_WORKERS = 1000
 
@@ -35,6 +34,8 @@ class _InvokeClient:
         self._notify_factory: Optional[NoticeFactory] = extensionLoader.get_extension(NoticeFactory, "feishu")()
         self._notify_factory.server_name = server_name
         self._notify_factory.url = self.notify_config.url
+        self.weight = {}
+
 
     @staticmethod
     def get_authorization() -> lawgenesis_pb2.Auth:
@@ -52,25 +53,33 @@ class _InvokeClient:
                                                     subtitle=self.server_name,
                                                     elements=[self._get_server_metadata()])
             raise RuntimeError(f"No available instances found for server: {self.server_name}")
-
-        url_key = random.choice(list(self._urls.keys()))
+        items, weights =  zip(*self.weight.items())
+        url_key = random.choices(items, weights=weights, k=1)
         _LOGGER.info(f"调用服务{url_key}")
-        return url_key
+        return url_key[0]
 
     def server_key(self, ip, port):
         return f"tri://{ip}:{port}/{self.server_name}"
 
     def get_service(self, instances: List[Instance] = None):
         instances = instances or self.nacos_client.get_service(server_name=self.server_name)
+        weight = {}
         urls = {}
         for instance in instances:
             key = self.server_key(instance.ip, instance.port)
             if key in self._urls:
                 urls[key] = self._urls[key]
+                weight[key] = self.weight[key]
                 continue
-            urls[key] = DubboClient(reference=ReferenceConfig.from_url(url=create_url(key)))
+            urls[key] = self.connect_client(key)
+            weight[key] = 10
 
         self._urls = urls
+        self.weight = weight
+
+    @staticmethod
+    def connect_client(url_key):
+        return DubboClient(reference=ReferenceConfig.from_url(url=url_key))
 
     def subscribe(self):
         def cb(instance_list: List[Instance]):
@@ -118,24 +127,27 @@ class _InvokeClient:
             DATA=request_data.param2bytes,
             BADA=metadata.basedata
         )
-        return self.unary(method_name)(law_request)
-
-
-
-    def unary(self, method_name: str):
-        url_key = self.client
-        client = self._urls[url_key]
         for _ in range(3):
+            url_key = self.client
+            client = self._urls[url_key]
             try:
-                return client.unary(
+                result = client.unary(
                     method_name=method_name,
                     request_serializer=lawgenesis_pb2.LawgenesisRequest.SerializeToString,
                     response_deserializer=lawgenesis_pb2.LawgenesisReply.FromString,
-                )
+                )(law_request)
+                self.weight[url_key] = min(10, self.weight[url_key] + 1)
+                return result
             except Exception as e:
                 _LOGGER.error(f"unary {method_name} failed {e}")
-        self._urls.pop(url_key, None)
-        raise RuntimeError(f"unary {method_name} failed")
+                # url_key 降权重
+                self.weight[url_key] = max(1, self.weight[url_key] - 1)
+                if self.weight[url_key] <= 1:
+                    _LOGGER.error(f"unary {method_name} failed {e}, 重新建立客户端")
+                    self._urls[url_key] = self.connect_client(url_key)
+        raise Exception(f"invokefailed, {self.weight}")
+
+
 
 class LawgenesisClient:
     def __init__(self, server_url=None):

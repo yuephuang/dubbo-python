@@ -25,13 +25,13 @@ import requests
 
 # --- 本地应用/库导入 ---
 from dubbo import Dubbo, Server
-from dubbo.constants import common_constants
 from dubbo.cache.cache_client import CacheClient
 from dubbo.component.asynchronous import AsyncRpcCallable
 from dubbo.component.nacos_client import NacosClinet
 from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig, NotifyConfig, LAW_SERVER_CONFIG, \
     METHOD_CONFIG, NOTIFY_CONFIG
 from dubbo.configs import ServiceConfig
+from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto import (
     ProtobufInterface,
