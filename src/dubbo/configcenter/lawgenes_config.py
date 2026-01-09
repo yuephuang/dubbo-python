@@ -75,7 +75,7 @@ class ConfigReloader:
             content = await self.client().async_get_config(config_name=self.config_name, group=self.group)
             self.update_cls(content)
         except Exception as e:
-            _LOGGER.error(f"Get config: {self.config_name}, failed: {e}")
+            _LOGGER.warning(f"Get config: {self.config_name}, failed: {e}")
 
     async def async_start_reloader(self):
         """
@@ -95,7 +95,7 @@ class ConfigReloader:
             _LOGGER.info(f"Successfully subscribed to Nacos config: {config_name}/{group}")
         except Exception as e:
             # 订阅失败不应阻塞应用启动
-            _LOGGER.error(f"Failed to subscribe to Nacos config: {config_name}/{group}. Error: {e}")
+            _LOGGER.warning(f"Failed to subscribe to Nacos config: {config_name}/{group}. Error: {e}")
 
 
 class LawServerConfig(ConfigReloader):

@@ -17,7 +17,7 @@ import contextvars
 import enum
 import re
 import threading
-
+from logging import Filter
 from loguru import logger
 
 from dubbo.configs import LoggerConfig
@@ -90,6 +90,11 @@ class NoColorFormatter:
         color_re = re.compile(r"\033\[[0-9;]*\w")
         self.log_format = color_re.sub("", ColorFormatter.LOG_FORMAT)
         self.suffix = f"[{suffix}] " if suffix else ""
+
+class LawFilter(Filter):
+    def filter(self, record):
+        record.msg = f"TRACE_ID:{TRACE_ID.get()} | CONTEXT_ID:{CONTEXT_ID.get()} | {record.msg}"
+        return True
 
 
 def format_record(record):
@@ -178,7 +183,7 @@ class _LoggerFactory:
             sink=lambda msg: print(msg, end=""),
             format=format_record,
             level=config.level,
-            filter=lambda record: record["extra"].update({"_formatter": formatter}) or True
+            filter=LawFilter
         )
 
     @classmethod
@@ -196,7 +201,7 @@ class _LoggerFactory:
             sink=config.file_config.file_name,
             format=format_record,
             level=config.level,
-            filter=lambda record: record["extra"].update({"_formatter": formatter}) or True,
+            filter=LawFilter,
             encoding="utf-8"
         )
 
@@ -218,7 +223,7 @@ class _LoggerFactory:
         # Add handler for Loki
         logger.add(
             sink=loki_uploader_handler,
-            format="{time} | {level: <8} | {name}:{function}:{line} - {message}",
+            format=LawFilter,
             level=config.level
         )
 

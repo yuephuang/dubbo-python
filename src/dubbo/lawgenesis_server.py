@@ -25,6 +25,7 @@ import requests
 
 # --- 本地应用/库导入 ---
 from dubbo import Dubbo, Server
+from dubbo.constants import common_constants
 from dubbo.cache.cache_client import CacheClient
 from dubbo.component.asynchronous import AsyncRpcCallable
 from dubbo.component.nacos_client import NacosClinet
@@ -51,7 +52,7 @@ from dubbo.url import create_url
 _LOGGER = loggerFactory.get_logger()
 
 try:
-    async_rpc_callable = AsyncRpcCallable()
+    async_rpc_callable = AsyncRpcCallable() if common_constants.ASYNC_RPC_ENABLED else None
 except Exception as e:
     _LOGGER.error(f"初始化 AsyncRpcCallable 失败: {e}")
     async_rpc_callable = None
@@ -105,7 +106,7 @@ class LawgenesisService:
     def _internet_ip(self) -> str:
         return ""
 
-    def _get_server_metadata(self) -> ServerMetaData:
+    def _get_server_metadata(self, message: str = "") -> ServerMetaData:
         host_name = os.environ.get("HOSTNAME", "NOT HOSTNAME")
         return ServerMetaData(
             server_name=self.law_server_config.name,
@@ -113,7 +114,7 @@ class LawgenesisService:
             host_name=host_name,
             intranet_ip=self._intranet_ip,
             internet_ip=self._internet_ip,
-            message="",
+            message=f"接口: {self.law_server_config.port}, {message}",
             start_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
 

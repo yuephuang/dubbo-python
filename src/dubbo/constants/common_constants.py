@@ -127,3 +127,6 @@ SERVER_THREAD_POOL_SIZE = int(os.environ.get("SERVER_THREAD_POOL_SIZE", 10))  # 
 
 # NOTIFY
 NOTIFY_URL = os.environ.get("NOTIFY_URL", "")
+
+# RPC
+ASYNC_RPC_ENABLED = os.environ.get("ASYNC_RPC_ENABLED", "false") == "true"
