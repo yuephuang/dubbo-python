@@ -21,7 +21,7 @@ from typing import Union, Callable, Optional, Any
 
 # --- 第三方库导入 ---
 import orjson
-import requests
+from prometheus_client import start_http_server
 
 # --- 本地应用/库导入 ---
 from dubbo import Dubbo, Server
@@ -42,7 +42,7 @@ from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID
-from dubbo.monitor.prometheus import MetricsCollector
+from dubbo.monitor.prometheus import EnhancedMetricsCollector
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
 from dubbo.proxy.handlers import RpcServiceHandler, RpcMethodHandler
@@ -92,10 +92,11 @@ class LawgenesisService:
         self.method_handlers: list[RpcMethodHandler] = []
         self._cache_map: dict[str, CacheClient] = {}
         self._limit_map: dict[str, LocalLimit] = {}
-        self._metrics_collector = MetricsCollector(system_update_interval=2)
         self._server_metadata: ServerMetaData = self._get_server_metadata()
         self._start_config_subscription()
         self._init_notification_service()
+        self.metrics_collector = EnhancedMetricsCollector(law_server_config.name,
+                                                          service_version=law_server_config.version)
         _LOGGER.info(f"LawgenesisService initialized for service: {self.law_server_config.name}")
 
     @property
@@ -139,7 +140,7 @@ class LawgenesisService:
     def methods(self, method_name: str,
                 method_config: Optional[LawMethodConfig] = None,
                 protobuf_type: str = "txt",
-                async_type: bool = True):
+                async_type: bool = False):
         """
         方法注册装饰器工厂，支持同步和异步业务函数。
         """
@@ -164,83 +165,86 @@ class LawgenesisService:
                 law_metadata = LawMetaData(request.BADA)
                 request_data = orjson.loads(request.DATA)
                 serialize_func = protobuf_interface(request_data)
+                with self.metrics_collector.start_request_timer(method_name=method_name):
+                    with trace_context_manager(trace_id=law_metadata.trace_id, context_id=serialize_func.context_id):
+                        _LOGGER.info(f"[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
 
-                with trace_context_manager(trace_id=law_metadata.trace_id, context_id=serialize_func.context_id):
-                    _LOGGER.info(f"[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
+                        # 1. 校验逻辑
+                        if law_metadata.data_type != protobuf_type:
+                            self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.INVALID_ARGUMENT.value)
+                            return self._create_response(law_metadata.basedata,
+                                                         ResponseProto(data={"message": "Type mismatch"},
+                                                                       context_id=serialize_func.context_id,
+                                                                       code=GRpcCode.INVALID_ARGUMENT.value).to_bytes())
 
-                    # 1. 校验逻辑
-                    if law_metadata.data_type != protobuf_type:
-                        return self._create_response(law_metadata.basedata,
-                                                     ResponseProto(data={"message": "Type mismatch"},
-                                                                   context_id=serialize_func.context_id,
-                                                                   code=GRpcCode.INVALID_ARGUMENT.value).to_bytes())
-
-                    if not self._check_auth(LawAuthInfo(law_metadata.auth)):
-                        return self._create_response(law_metadata.basedata, ResponseProto(data="Auth failed",
-                                                                                          context_id=serialize_func.context_id,
-                                                                                          code=GRpcCode.UNAUTHENTICATED.value).to_bytes())
-
-                    if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
-                        return self._create_response(law_metadata.basedata, ResponseProto(data="Rate limited",
-                                                                                          context_id=serialize_func.context_id,
-                                                                                          code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes())
-
-                    # 2. 异步任务发布 (消息队列模式)
-                    if async_type:
-                        try:
-                            request_data["callback_url"] = law_metadata.callback_url
-                            task_id = async_rpc_callable.pushlish_task(method_name, request_data)
-                            return self._create_response(law_metadata.basedata, ResponseProto(data={"task_id": task_id},
+                        if not self._check_auth(LawAuthInfo(law_metadata.auth)):
+                            self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.UNAUTHENTICATED.value)
+                            return self._create_response(law_metadata.basedata, ResponseProto(data="Auth failed",
                                                                                               context_id=serialize_func.context_id,
-                                                                                              code=GRpcCode.OK.value).to_bytes())
-                        except Exception as e:
-                            _LOGGER.error(f"Async task publish failed: {e}")
+                                                                                              code=GRpcCode.UNAUTHENTICATED.value).to_bytes())
 
-                    # 3. 缓存检查
-                    if law_metadata.is_cache:
-                        cached = self._get_cache(method_name, serialize_func.cache_key)
-                        if cached: return self._create_response(law_metadata.basedata, cached)
+                        if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
+                            self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.RESOURCE_EXHAUSTED.value)
+                            return self._create_response(law_metadata.basedata, ResponseProto(data="Rate limited",
+                                                                                              context_id=serialize_func.context_id,
+                                                                                              code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes())
 
-                    # 4. 执行业务逻辑 (区分同步异步)
-                    try:
-                        if is_async_func:
-                            # 如果是异步函数，需要在当前/全局事件循环中运行
-                            # 注意：在同步 wrapper 中调用异步 func 需要 run_until_complete 或类似机制
+                        # 2. 异步任务发布 (消息队列模式)
+                        if async_type:
                             try:
-                                loop = asyncio.get_event_loop()
-                            except RuntimeError:
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
+                                request_data["callback_url"] = law_metadata.callback_url
+                                task_id = async_rpc_callable.pushlish_task(method_name, request_data)
+                                return self._create_response(law_metadata.basedata, ResponseProto(data={"task_id": task_id},
+                                                                                                  context_id=serialize_func.context_id,
+                                                                                                  code=GRpcCode.OK.value).to_bytes())
+                            except Exception as e:
+                                _LOGGER.error(f"Async task publish failed: {e}")
 
-                            if loop.is_running():
-                                # 如果循环正在运行（例如已经在 async 环境下），则需要特殊处理
-                                # 这里假设 dubbo 框架调用 wrapper 是同步的
-                                future = asyncio.run_coroutine_threadsafe(func(serialize_func), loop)
-                                response = future.result()
-                            else:
-                                response = loop.run_until_complete(func(serialize_func))
-                        else:
-                            response = func(serialize_func)
-
-                        # 5. 构造响应
-                        if not isinstance(response, dict):
-                            raise ValueError("Response must be dict")
-
-                        response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
-                                                      code=GRpcCode.OK.value).to_bytes()
+                        # 3. 缓存检查
                         if law_metadata.is_cache:
-                            self._set_cache(method_name, serialize_func.cache_key, response_data)
+                            cached = self._get_cache(method_name, serialize_func.cache_key)
+                            if cached: return self._create_response(law_metadata.basedata, cached)
 
-                        return self._create_response(law_metadata.basedata, response_data)
+                        # 4. 执行业务逻辑 (区分同步异步)
+                        try:
+                            if is_async_func:
+                                # 如果是异步函数，需要在当前/全局事件循环中运行
+                                # 注意：在同步 wrapper 中调用异步 func 需要 run_until_complete 或类似机制
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                except RuntimeError:
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
 
-                    except Exception as e:
-                        _LOGGER.error(f"[{method_name}] Error: {e}", exc_info=True)
-                        return self._create_response(law_metadata.basedata,
-                                                     ResponseProto(data=str(e), context_id=serialize_func.context_id,
-                                                                   code=GRpcCode.UNAVAILABLE.value).to_bytes())
-                    finally:
-                        cost = (time.perf_counter() - start_time) * 1000
-                        _LOGGER.info(f"[{method_name}] End, cost: {cost:.4f}ms")
+                                if loop.is_running():
+                                    # 如果循环正在运行（例如已经在 async 环境下），则需要特殊处理
+                                    # 这里假设 dubbo 框架调用 wrapper 是同步的
+                                    future = asyncio.run_coroutine_threadsafe(func(serialize_func), loop)
+                                    response = future.result()
+                                else:
+                                    response = loop.run_until_complete(func(serialize_func))
+                            else:
+                                response = func(serialize_func)
+
+                            # 5. 构造响应
+                            if not isinstance(response, dict):
+                                raise ValueError("Response must be dict")
+
+                            response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
+                                                          code=GRpcCode.OK.value).to_bytes()
+                            if law_metadata.is_cache:
+                                self._set_cache(method_name, serialize_func.cache_key, response_data)
+
+                            return self._create_response(law_metadata.basedata, response_data)
+
+                        except Exception as e:
+                            _LOGGER.error(f"[{method_name}] Error: {e}", exc_info=True)
+                            return self._create_response(law_metadata.basedata,
+                                                         ResponseProto(data=str(e), context_id=serialize_func.context_id,
+                                                                       code=GRpcCode.UNAVAILABLE.value).to_bytes())
+                        finally:
+                            cost = (time.perf_counter() - start_time) * 1000
+                            _LOGGER.info(f"[{method_name}] End, cost: {cost:.4f}ms")
 
             # 注册逻辑
             self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
@@ -314,16 +318,10 @@ class LawgenesisService:
                 url=create_url(f"tri://{self.law_server_config.host}:{self.law_server_config.port}"))
         except Exception as e:
             _LOGGER.error(f"Failed to register service: {e}")
+        # metrics 启动
+        start_http_server(8000)
         try:
             while self.run:
-                metrics_data = self._metrics_collector.get_all_metrics()
-                if self.law_server_config.pushgateway_url:
-                    try:
-                        server_meta = self._get_server_metadata()
-                        url = f"{self.law_server_config.pushgateway_url}/metrics/job/{server_meta.server_name}/instance/{server_meta.host_name}"
-                        requests.post(url, data=metrics_data)
-                    except Exception as e:
-                        _LOGGER.error(f"Failed to push metrics: {e}")
                 await asyncio.sleep(1)
         except (KeyboardInterrupt, asyncio.CancelledError):
             self.run = False
