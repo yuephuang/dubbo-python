@@ -315,7 +315,7 @@ class LawgenesisService:
             async_rpc_callable.start_consumer()
         try:
             self.nacos_register_client.register_service(
-                url=create_url(f"tri://{self.law_server_config.host}:{self.law_server_config.port}"))
+                url=create_url(f"tri://{common_constants.SERVER_NACOS_HOST}:{common_constants.SERVER_NACOS_PORT}/",))
         except Exception as e:
             _LOGGER.error(f"Failed to register service: {e}")
         # metrics 启动

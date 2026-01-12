@@ -63,11 +63,8 @@ DEFAULT_SERVER_VERSION = os.environ.get("DEFAULT_SERVER_VERSION", "1.0.0")  # �
 ENV_KEY = os.environ.get("ENV_KEY", "dev")  # 环境标识（开发、测试、生产等）
 
 # --- Nacos注册中心配置 --- 
-NACOS_HOST = os.environ.get("NACOS_HOST", "")  # Nacos服务器主机
-NACOS_PORT = os.environ.get("NACOS_PORT", "")  # Nacos服务器端口
-NACOS_NAMESPACE = os.environ.get("NACOS_NAMESPACE", "")  # Nacos命名空间
-NACOS_USERNAME = os.environ.get("NACOS_USERNAME", "")  # Nacos用户名
-NACOS_PASSWORD = os.environ.get("NACOS_PASSWORD", "")  # Nacos密码
+SERVER_NACOS_PORT = os.environ.get("SERVER_NACOS_PORT") or DEFAULT_SERVER_PORT # 对外暴漏的短口
+SERVER_NACOS_HOST = os.environ.get("SERVER_NACOS_HOST") or LOCAL_HOST_VALUE # 对外暴露的IP
 NACOS_URL = os.environ.get("NACOS_URL")  # Nacos完整URL
 NACOS_METAINFO = {
     "dubbo": DUBBO_VALUE,
