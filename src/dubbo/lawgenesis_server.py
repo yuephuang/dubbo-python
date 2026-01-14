@@ -251,7 +251,6 @@ class LawgenesisService:
             self._limit_map[method_name] = LocalLimit(
                 limit_config=method_config.rate_limit(method_name=method_name).limits_keys_operation)
             self._cache_map[method_name] = CacheClient(method_config.cache(method_name=method_name))
-            self._metrics_collector.register_metrics(method_name=method_name)
 
             # 异步执行器注册，这里需要确保 async_rpc_callable 能处理协程
             if async_rpc_callable:
