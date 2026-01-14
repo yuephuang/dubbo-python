@@ -3,7 +3,7 @@ import datetime
 import os
 import random
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from v2.nacos import Instance
 
@@ -23,7 +23,9 @@ _LOGGER = loggerFactory.get_logger()
 
 
 class _InvokeClient:
-    def __init__(self, server_name: str, client_config: LawClientConfig, notify_config=None):
+    def __init__(self, server_name: str, client_config: LawClientConfig, notify_config=None,
+                 request_deserializer=None, response_deserialize=None
+                 ):
         self.client_config = client_config or LawClientConfig()
         self.server_name = server_name
         self._executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
@@ -35,7 +37,8 @@ class _InvokeClient:
         self._notify_factory.server_name = server_name
         self._notify_factory.url = self.notify_config.url
         self.weight = {}
-
+        self.request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest.SerializeToString
+        self.response_deserialize = response_deserialize or lawgenesis_pb2.LawgenesisReply.FromString
 
     @staticmethod
     def get_authorization() -> lawgenesis_pb2.Auth:
@@ -83,6 +86,7 @@ class _InvokeClient:
 
     def subscribe(self):
         def cb(instance_list: List[Instance]):
+            print(instance_list)
             self.get_service(instance_list)
 
         self.nacos_client.subscribe_service(server_name=self.server_name, group_name=common_constants.GROUP_KEY,
@@ -118,23 +122,24 @@ class _InvokeClient:
                                                         elements=[self._get_server_metadata(message=e)])
             raise e
 
-    def invoke(self, method_name: str, request_data: any) -> lawgenesis_pb2.LawgenesisReply:
+    def invoke(self, method_name: str, request_data: Any):
         metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
         metadata.data_type = request_data.protobuf_type
         metadata.auth = self.get_authorization()
 
-        law_request = lawgenesis_pb2.LawgenesisRequest(
-            DATA=request_data.param2bytes,
+        law_request = self.request_deserializer(
+            DATA=request_data,
             BADA=metadata.basedata
         )
-        for _ in range(3):
+        # 最后尝试两次
+        for _ in range(2):
             url_key = self.client
             client = self._urls[url_key]
             try:
                 result = client.unary(
                     method_name=method_name,
-                    request_serializer=lawgenesis_pb2.LawgenesisRequest.SerializeToString,
-                    response_deserializer=lawgenesis_pb2.LawgenesisReply.FromString,
+                    request_serializer=self.request_deserializer,
+                    response_deserializer=self.response_deserialize,
                 )(law_request)
                 self.weight[url_key] = min(10, self.weight[url_key] + 1)
                 return result
@@ -143,9 +148,8 @@ class _InvokeClient:
                 # url_key 降权重
                 self.weight[url_key] = max(1, self.weight[url_key] - 1)
                 if self.weight[url_key] <= 1:
-                    _LOGGER.error(f"unary {method_name} failed {e}, 重新建立客户端")
-                    self._urls[url_key] = self.connect_client(url_key)
-        raise Exception(f"invokefailed, {self.weight}")
+                    self._urls.pop(url_key)
+        raise Exception(f"{method_name} invoke failed, {self.weight}")
 
 
 
@@ -156,14 +160,21 @@ class LawgenesisClient:
         self._loop = None
         self._loop_thread = None
 
-    def select_invoke_client(self, server_name: str, client_config: LawClientConfig = None) -> _InvokeClient:
+    def select_invoke_client(self, server_name: str, client_config: LawClientConfig = None,
+                             request_deserializer=None, response_deserializer=None
+                             ) -> _InvokeClient:
         if server_name not in self.__invoke_client:
-            invoker = _InvokeClient(server_name, client_config)
+            invoker = _InvokeClient(server_name, client_config, request_deserializer, response_deserializer)
             invoker.get_service()
             invoker.subscribe()
             self.__invoke_client[server_name] = invoker
         return self.__invoke_client[server_name]
 
-    async def async_invoke(self, server_name, method_name, request_data, client_config: LawClientConfig = None):
-        invoke_client = self.select_invoke_client(server_name, client_config)
+    async def async_invoke(self, server_name, method_name, request_data,
+                           client_config: LawClientConfig = None,
+                            request_deserializer = None,
+                           response_deserializer = None
+
+    ):
+        invoke_client = self.select_invoke_client(server_name, client_config,  request_deserializer, response_deserializer)
         return await invoke_client.async_invoke(method_name, request_data)

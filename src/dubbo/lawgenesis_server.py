@@ -12,9 +12,11 @@
 # --- 标准库导入 ---
 import asyncio
 import datetime
+import hashlib
 import os
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 from functools import wraps
 from typing import Union, Callable, Optional, Any
@@ -140,7 +142,9 @@ class LawgenesisService:
     def methods(self, method_name: str,
                 method_config: Optional[LawMethodConfig] = None,
                 protobuf_type: str = "txt",
-                async_type: bool = False):
+                async_type: bool = False,
+                request_deserializer=None, response_deserializer=None
+                ):
         """
         方法注册装饰器工厂，支持同步和异步业务函数。
         """
@@ -148,62 +152,72 @@ class LawgenesisService:
             raise ValueError(f"{method_name} is a reserved method name")
         method_config = method_config or self.law_method_config
 
+        def _create_response(base_data: lawgenesis_pb2.BaseData,
+                             code: int,
+                             context_id: str,
+                             data: Union[bytes, Any]) -> response_deserializer:
+            return response_deserializer(BADA=base_data,
+                                         code = code,
+                                         context_id = context_id,
+                                         Response=data)
+        
         def decorator(func: Callable):
             # 判断原函数是否为异步函数
             is_async_func = asyncio.iscoroutinefunction(func)
 
             @wraps(func)
-            def wrapper(request: lawgenesis_pb2.LawgenesisRequest) -> lawgenesis_pb2.LawgenesisReply:
+            def wrapper(request: Union[request_deserializer, lawgenesis_pb2.LawgenesisRequest]) -> Union[response_deserializer, lawgenesis_pb2.LawgenesisReply]:
                 """
                 内部包装器逻辑，处理通用的 RPC 生命周期。
                 注：为了兼容性，如果内部 func 是异步的，此 wrapper 在 Dubbo 框架下可能需要
                 配合具体的异步 RPC 处理器，或者在内部通过事件循环运行。
                 这里提供一个通用的逻辑处理模板。
                 """
-                start_time = time.perf_counter()
-                protobuf_interface = extensionLoader.get_extension(ProtobufInterface, protobuf_type)
-                law_metadata = LawMetaData(request.BADA)
-                request_data = orjson.loads(request.DATA)
-                serialize_func = protobuf_interface(request_data)
+                start_time = time.perf_counter() # 启动时间
+                context_id = uuid.uuid4().hex # 请求id
+                law_metadata = LawMetaData(request.BADA) # 请求基本信息
+                request_data = request.DATA # 请求数据
                 with self.metrics_collector.start_request_timer(method_name=method_name):
-                    with trace_context_manager(trace_id=law_metadata.trace_id, context_id=serialize_func.context_id):
-                        _LOGGER.info(f"[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
+                    with trace_context_manager(trace_id=law_metadata.trace_id, context_id=context_id):
+                        _LOGGER.info(f"[{context_id}]-[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
 
-                        # 1. 校验逻辑
-                        if law_metadata.data_type != protobuf_type:
-                            self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.INVALID_ARGUMENT.value)
-                            return self._create_response(law_metadata.basedata,
-                                                         ResponseProto(data={"message": "Type mismatch"},
-                                                                       context_id=serialize_func.context_id,
-                                                                       code=GRpcCode.INVALID_ARGUMENT.value).to_bytes())
 
+                        # 请求校验
                         if not self._check_auth(LawAuthInfo(law_metadata.auth)):
                             self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.UNAUTHENTICATED.value)
-                            return self._create_response(law_metadata.basedata, ResponseProto(data="Auth failed",
-                                                                                              context_id=serialize_func.context_id,
-                                                                                              code=GRpcCode.UNAUTHENTICATED.value).to_bytes())
+                            return _create_response(base_data=law_metadata.basedata,
+                                                    code=GRpcCode.UNAUTHENTICATED.value,
+                                                    context_id=context_id,
+                                                    data=orjson.dumps({"error": f"{method_name} 鉴权失败"})
+                                                    )
 
+                        # 流控校验
                         if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
                             self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.RESOURCE_EXHAUSTED.value)
-                            return self._create_response(law_metadata.basedata, ResponseProto(data="Rate limited",
-                                                                                              context_id=serialize_func.context_id,
-                                                                                              code=GRpcCode.RESOURCE_EXHAUSTED.value).to_bytes())
+                            return _create_response(base_data=law_metadata.basedata,
+                                                    code=GRpcCode.RESOURCE_EXHAUSTED.value,
+                                                    context_id=context_id,
+                                                    data=orjson.dumps({"error": f"{method_name} 请求限量"})
+                                                    )
 
                         # 2. 异步任务发布 (消息队列模式)
                         if async_type:
                             try:
                                 request_data["callback_url"] = law_metadata.callback_url
                                 task_id = async_rpc_callable.pushlish_task(method_name, request_data)
-                                return self._create_response(law_metadata.basedata, ResponseProto(data={"task_id": task_id},
-                                                                                                  context_id=serialize_func.context_id,
-                                                                                                  code=GRpcCode.OK.value).to_bytes())
+                                return _create_response(base_data=law_metadata.basedata,
+                                                        code=GRpcCode.OK.value,
+                                                        context_id=context_id,
+                                                        data=orjson.dumps({"task_id": task_id})
+                                                        )
                             except Exception as e:
-                                _LOGGER.error(f"Async task publish failed: {e}")
+                                _LOGGER.error(f"[{context_id}]-[{method_name}] Async task publish failed: {e}")
 
+                        cache_key = hashlib.sha256(request_data)
                         # 3. 缓存检查
                         if law_metadata.is_cache:
-                            cached = self._get_cache(method_name, serialize_func.cache_key)
-                            if cached: return self._create_response(law_metadata.basedata, cached)
+                            cached = self._get_cache(method_name, cache_key)
+                            if cached: return _create_response(law_metadata.basedata, cached)
 
                         # 4. 执行业务逻辑 (区分同步异步)
                         try:
@@ -219,39 +233,42 @@ class LawgenesisService:
                                 if loop.is_running():
                                     # 如果循环正在运行（例如已经在 async 环境下），则需要特殊处理
                                     # 这里假设 dubbo 框架调用 wrapper 是同步的
-                                    future = asyncio.run_coroutine_threadsafe(func(serialize_func), loop)
+                                    future = asyncio.run_coroutine_threadsafe(func(request_data), loop)
                                     response = future.result()
                                 else:
-                                    response = loop.run_until_complete(func(serialize_func))
+                                    response = loop.run_until_complete(func(request_data))
                             else:
-                                response = func(serialize_func)
+                                response = func(request_data)
 
-                            # 5. 构造响应
-                            if not isinstance(response, dict):
-                                raise ValueError("Response must be dict")
-
-                            response_data = ResponseProto(data=response, context_id=serialize_func.context_id,
-                                                          code=GRpcCode.OK.value).to_bytes()
                             if law_metadata.is_cache:
-                                self._set_cache(method_name, serialize_func.cache_key, response_data)
+                                self._set_cache(method_name, cache_key, response)
 
-                            return self._create_response(law_metadata.basedata, response_data)
+                            return _create_response(
+                                base_data=law_metadata.basedata,
+                                code=GRpcCode.OK.value,
+                                context_id=context_id,
+                                data=response
+                            )
 
                         except Exception as e:
-                            _LOGGER.error(f"[{method_name}] Error: {e}", exc_info=True)
-                            return self._create_response(law_metadata.basedata,
-                                                         ResponseProto(data=str(e), context_id=serialize_func.context_id,
-                                                                       code=GRpcCode.UNAVAILABLE.value).to_bytes())
+                            error_msg = f"[{context_id}]-[{method_name}] Error: {e}"
+                            _LOGGER.error(f"{error_msg}", exc_info=True)
+                            return _create_response(
+                                base_data=law_metadata.basedata,
+                                code=GRpcCode.UNAVAILABLE.value,
+                                context_id=context_id,
+                                data=orjson.dumps({"error": error_msg})
+                            )
+
                         finally:
                             cost = (time.perf_counter() - start_time) * 1000
-                            _LOGGER.info(f"[{method_name}] End, cost: {cost:.4f}ms")
+                            _LOGGER.info(f"[{context_id}]-[{method_name}] End, cost: {cost:.4f}ms")
 
             # 注册逻辑
             self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
             self._limit_map[method_name] = LocalLimit(
                 limit_config=method_config.rate_limit(method_name=method_name).limits_keys_operation)
             self._cache_map[method_name] = CacheClient(method_config.cache(method_name=method_name))
-            self._metrics_collector.register_metrics(method_name=method_name)
 
             # 异步执行器注册，这里需要确保 async_rpc_callable 能处理协程
             if async_rpc_callable:
@@ -267,9 +284,6 @@ class LawgenesisService:
         def health_check(request: Any, law_basedata: LawMetaData = None) -> dict:
             return {"status": "ok"}
 
-    @staticmethod
-    def _create_response(base_data: lawgenesis_pb2.BaseData, data: bytes) -> lawgenesis_pb2.LawgenesisReply:
-        return lawgenesis_pb2.LawgenesisReply(BADA=base_data, Response=data)
 
     def _get_cache(self, method_name: str, key: str) -> Optional[bytes]:
         cache_client = self._cache_map.get(method_name)
