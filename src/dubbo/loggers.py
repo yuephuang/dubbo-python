@@ -30,74 +30,17 @@ CONTEXT_ID = contextvars.ContextVar('context_id', default='N/A')
 THREAD_ID = uuid.uuid4().hex
 from dubbo.monitor.loki import LokiQueueHandler
 
-
-class ColorFormatter:
+def custom_formatter(record):
     """
-    A formatter with color.
-    It will format the log message like this:
-    2024-06-24 16:39:57 | DEBUG | test_logger_factory:test_with_config:44 - [Dubbo] debug log
+    统一的格式化函数
     """
-
-    @enum.unique
-    class Colors(enum.Enum):
-        """
-        Colors for log messages.
-        """
-
-        END = "\033[0m"
-        BOLD = "\033[1m"
-        BLUE = "\033[34m"
-        GREEN = "\033[32m"
-        PURPLE = "\033[35m"
-        CYAN = "\033[36m"
-        RED = "\033[31m"
-        YELLOW = "\033[33m"
-        GREY = "\033[38;5;240m"
-
-    COLOR_LEVEL_MAP = {
-        "DEBUG": Colors.BLUE.value,
-        "INFO": Colors.GREEN.value,
-        "WARNING": Colors.YELLOW.value,
-        "ERROR": Colors.RED.value,
-        "CRITICAL": Colors.RED.value + Colors.BOLD.value,
-    }
-
-    DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
-
-    LOG_FORMAT: str = (
-        f"{Colors.GREEN.value}{{time:YYYY-MM-DD HH:mm:ss}}{Colors.END.value}"
-        " | "
-        "{{level_color}}{{level: <7}}{{end_color}}"
-        " | "
-        f"{Colors.CYAN.value}{{extra[trace_id]}}:{{name}}:{{function}}:{{line}}{Colors.END.value}"
-        " - "
-        f"{Colors.PURPLE.value}[Dubbo]{Colors.END.value} "
-        "{{suffix}}"
-        "{{message_color}}{{message}}{{end_color}}"
-    )
-
-    def __init__(self, suffix: str = ""):
-        self.suffix = f"{self.Colors.PURPLE.value}[{suffix}]{self.Colors.END.value} " if suffix else ""
-
-
-class NoColorFormatter:
-    """
-    A formatter without color.
-    It will format the log message like this:
-    2024-06-24 16:39:57 | DEBUG | test_logger_factory:test_with_config:44 - [Dubbo] debug log
-    """
-
-    def __init__(self, suffix: str = ""):
-        color_re = re.compile(r"\033\[[0-9;]*\w")
-        self.log_format = color_re.sub("", ColorFormatter.LOG_FORMAT)
-        self.suffix = f"[{suffix}] " if suffix else ""
-
-
-def trace_formatter(record):
-    """自定义格式化器，添加 trace_id 和 content_id"""
     # 获取当前的 trace_id 和 content_id
     trace_id = TRACE_ID.get()
     content_id = CONTEXT_ID.get()
+
+    # 设置到 extra 中
+    record["extra"]["trace_id"] = trace_id
+    record["extra"]["content_id"] = content_id
 
     # 构建前缀
     prefix_parts = []
@@ -106,28 +49,11 @@ def trace_formatter(record):
     if content_id:
         prefix_parts.append(f"[content:{content_id}]")
 
-    prefix = " ".join(prefix_parts)
-    if prefix:
-        record["extra"]["prefix"] = prefix + " "
+    # 处理前缀
+    if prefix_parts:
+        record["extra"]["prefix"] = " ".join(prefix_parts) + " "
     else:
         record["extra"]["prefix"] = ""
-
-    return record
-
-
-def format_record(record):
-    """
-    Custom format function for loguru
-    """
-    # Get trace_id from context vars
-    record["extra"]["trace_id"] = TRACE_ID.get()
-    record["extra"]["content_id"] = CONTEXT_ID.get()
-    # Apply coloring based on level
-    level_name = record["level"].name
-    colors = ColorFormatter.COLOR_LEVEL_MAP
-    record["level_color"] = colors.get(level_name, "")
-    record["message_color"] = colors.get(level_name, "")
-    record["end_color"] = ColorFormatter.Colors.END.value
 
     # Handle suffix
     formatter = record["extra"].get("_formatter")
@@ -136,7 +62,9 @@ def format_record(record):
     else:
         record["suffix"] = ""
 
-    return record
+    # 返回 Loguru 格式字符串
+    # 这里使用了 Loguru 的标记语言来添加颜色
+    return "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<blue>{function}</blue>:<yellow>{line}</yellow> - <level>{extra[prefix]}{message}</level>\n"
 
 
 class _LoggerFactory:
@@ -193,15 +121,11 @@ class _LoggerFactory:
         """
         config = cls._config
 
-        # Create formatter
-        formatter = ColorFormatter(cls.DEFAULT_LOGGER_NAME)
-
         # Add handler with custom format function
         cls._logger_id = logger.add(
             sink=lambda msg: print(msg, end=""),
-            format=format_record,
+            format=custom_formatter,
             level=config.level,
-            filter=trace_formatter
         )
 
     @classmethod
@@ -212,14 +136,12 @@ class _LoggerFactory:
         config = cls._config
 
         # Create no-color formatter
-        formatter = NoColorFormatter(cls.DEFAULT_LOGGER_NAME)
 
         # Add handler with custom format function
         logger.add(
             sink=config.file_config.file_name,
-            format=format_record,
+            format=custom_formatter,
             level=config.level,
-            filter=trace_formatter,
             encoding="utf-8"
         )
 
@@ -241,7 +163,7 @@ class _LoggerFactory:
         # Add handler for Loki
         logger.add(
             sink=loki_uploader_handler,
-            format=trace_formatter,
+            format=custom_formatter,
             level=config.level
         )
 
@@ -267,50 +189,6 @@ class _LoggerFactory:
 
         return logger_adapter
 
-
-class LoggerAdapter:
-    """
-    Adapter to make loguru logger compatible with the previous logging.Logger interface
-    """
-
-    def __init__(self, name: str):
-        self.name = name
-        self._logger = logger.bind(name=name)
-
-    def _log(self, level: str, msg, *args, **kwargs):
-        # Handle args formatting
-        if args:
-            msg = msg % args
-
-        # Add trace_id to log context
-        trace_id = TRACE_ID.get()
-        context_id = CONTEXT_ID.get()
-
-        # Bind extra context
-        log = self._logger.bind(trace_id=trace_id)
-
-        # Log with appropriate level
-        log.log(level.upper(), msg)
-
-    def debug(self, msg, *args, **kwargs):
-        self._log("DEBUG", msg, *args, **kwargs)
-
-    def info(self, msg, *args, **kwargs):
-        self._log("INFO", msg, *args, **kwargs)
-
-    def warning(self, msg, *args, **kwargs):
-        self._log("WARNING", msg, *args, **kwargs)
-
-    def error(self, msg, *args, **kwargs):
-        self._log("ERROR", msg, *args, **kwargs)
-
-    def critical(self, msg, *args, **kwargs):
-        self._log("CRITICAL", msg, *args, **kwargs)
-
-    def setLevel(self, level):
-        # Loguru handles levels differently, this is just for compatibility
-        pass
-
-
 # expose loggerFactory
 loggerFactory = _LoggerFactory
+loggerFactory.set_config(LoggerConfig())
