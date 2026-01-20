@@ -246,9 +246,7 @@ class AioServer(Server):
             else:
                 self._exported = True
             _LOGGER.info(
-                "Exported the server. host: %s, port: %s",
-                self._url.host,
-                self._url.port,
+                f"Exported the server. host: {self._url.host}, port: {self._url.port}"
             )
         finally:
             self._exporting = False

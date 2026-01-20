@@ -17,6 +17,7 @@ import contextvars
 import enum
 import re
 import threading
+import uuid
 
 from loguru import logger
 
@@ -26,7 +27,7 @@ __all__ = ["loggerFactory"]
 
 TRACE_ID = contextvars.ContextVar('trace_id', default='N/A')
 CONTEXT_ID = contextvars.ContextVar('context_id', default='N/A')
-
+THREAD_ID = uuid.uuid4().hex
 from dubbo.monitor.loki import LokiQueueHandler
 
 
@@ -245,12 +246,11 @@ class _LoggerFactory:
         )
 
     @classmethod
-    def get_logger(cls, name=DEFAULT_LOGGER_NAME) -> "LoggerAdapter":
+    def get_logger(cls, name=DEFAULT_LOGGER_NAME):
         """
         Get the logger. class method.
 
         :return: The logger adapter.
-        :rtype: LoggerAdapter
         """
         logger_adapter = cls._loggers.get(name)
         if logger_adapter is not None:
@@ -262,7 +262,7 @@ class _LoggerFactory:
             if logger_adapter is not None:
                 return logger_adapter
 
-            logger_adapter = LoggerAdapter(name)
+            logger_adapter = logger.bind(name=name)
             cls._loggers[name] = logger_adapter
 
         return logger_adapter

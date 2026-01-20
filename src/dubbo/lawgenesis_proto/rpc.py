@@ -1,4 +1,4 @@
-from dubbo.lawgenesis_proto import lawgenesis_pb2
+from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
 from dubbo.proxy.handlers import RpcMethodHandler
 
 

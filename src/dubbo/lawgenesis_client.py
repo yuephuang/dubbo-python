@@ -13,7 +13,8 @@ from dubbo.configcenter.lawgenes_config import LawClientConfig, NotifyConfig
 from dubbo.configs import ReferenceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.lawgenesis_proto import lawgenesis_pb2, LawMetaData
+from dubbo.lawgenesis_proto import LawMetaData
+from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
 from dubbo.loggers import loggerFactory
 from dubbo.notify import NoticeFactory, ServerMetaData
 
@@ -37,8 +38,8 @@ class _InvokeClient:
         self._notify_factory.server_name = server_name
         self._notify_factory.url = self.notify_config.url
         self.weight = {}
-        self.request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest.SerializeToString
-        self.response_deserialize = response_deserialize or lawgenesis_pb2.LawgenesisReply.FromString
+        self.request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest
+        self.response_deserialize = response_deserialize or lawgenesis_pb2.LawgenesisReply
 
     @staticmethod
     def get_authorization() -> lawgenesis_pb2.Auth:
@@ -124,7 +125,6 @@ class _InvokeClient:
 
     def invoke(self, method_name: str, request_data: Any):
         metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
-        metadata.data_type = request_data.protobuf_type
         metadata.auth = self.get_authorization()
 
         law_request = self.request_deserializer(
@@ -138,8 +138,8 @@ class _InvokeClient:
             try:
                 result = client.unary(
                     method_name=method_name,
-                    request_serializer=self.request_deserializer,
-                    response_deserializer=self.response_deserialize,
+                    request_serializer=self.request_deserializer.SerializeToString,
+                    response_deserializer=self.response_deserialize.FromString,
                 )(law_request)
                 self.weight[url_key] = min(10, self.weight[url_key] + 1)
                 return result

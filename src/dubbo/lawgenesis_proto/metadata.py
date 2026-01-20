@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Dict
 
-from dubbo.lawgenesis_proto import lawgenesis_pb2
+from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
 
 
 class LawAuthInfo:
@@ -39,7 +39,6 @@ class LawMetaData:
         """
         if not isinstance(basedata, lawgenesis_pb2.BaseData):
             raise TypeError("basedata must be an instance of lawgenesis_pb2.BaseData")
-        print(basedata)
         self._baseData = basedata
         self.validate()
 

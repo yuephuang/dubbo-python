@@ -22,12 +22,9 @@ from typing import Dict, List
 
 from aiohttp import ClientSession
 
-from dubbo.loggers import loggerFactory
+from dubbo.loggers import loggerFactory, THREAD_ID
 
 _LOGGER = loggerFactory.get_logger()
-
-_SERVER_ID = uuid.uuid4().hex
-
 
 class ServerMetaData(object):
     """
@@ -53,7 +50,7 @@ class ServerMetaData(object):
             "internet_ip": self.internet_ip,
             "message": self.message,
             "start_time": self.start_time,
-            "uuid": _SERVER_ID
+            "uuid": THREAD_ID
         }
 
 

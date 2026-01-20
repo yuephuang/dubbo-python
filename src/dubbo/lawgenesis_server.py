@@ -14,6 +14,7 @@ import asyncio
 import datetime
 import hashlib
 import os
+import random
 import threading
 import time
 import uuid
@@ -35,20 +36,16 @@ from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig,
 from dubbo.configs import ServiceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.lawgenesis_proto import (
-    ProtobufInterface,
-    ResponseProto,
-)
-from dubbo.lawgenesis_proto import lawgenesis_pb2
-from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
+from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
+from dubbo.lawgenesis_proto.metadata import LawAuthInfo, LawMetaData
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
-from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID
+from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID, THREAD_ID
+from dubbo.monitor.prometheus import MetricsCollector
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
 from dubbo.proxy.handlers import RpcServiceHandler, RpcMethodHandler
 from dubbo.url import create_url
-from dubbo.monitor.prometheus import MetricsCollector
 
 # --- 全局常量和配置 ---
 _LOGGER = loggerFactory.get_logger()
@@ -140,7 +137,6 @@ class LawgenesisService:
 
     def methods(self, method_name: str,
                 method_config: Optional[LawMethodConfig] = None,
-                protobuf_type: str = "txt",
                 async_type: bool = False,
                 request_deserializer=None, response_deserializer=None
                 ):
@@ -150,6 +146,8 @@ class LawgenesisService:
         if method_name == "healthy":
             raise ValueError(f"{method_name} is a reserved method name")
         method_config = method_config or self.law_method_config
+        request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest
+        response_deserializer = response_deserializer or lawgenesis_pb2.LawgenesisReply
 
         def _create_response(base_data: lawgenesis_pb2.BaseData,
                              code: int,
@@ -165,7 +163,7 @@ class LawgenesisService:
             is_async_func = asyncio.iscoroutinefunction(func)
 
             @wraps(func)
-            def wrapper(request: Union[request_deserializer, lawgenesis_pb2.LawgenesisRequest]) -> Union[response_deserializer, lawgenesis_pb2.LawgenesisReply]:
+            def wrapper(request: Union[request_deserializer, lawgenesis_pb2.LawgenesisRequest]) -> Union[request_deserializer, lawgenesis_pb2.LawgenesisReply]:
                 """
                 内部包装器逻辑，处理通用的 RPC 生命周期。
                 注：为了兼容性，如果内部 func 是异步的，此 wrapper 在 Dubbo 框架下可能需要
@@ -176,97 +174,125 @@ class LawgenesisService:
                 context_id = uuid.uuid4().hex # 请求id
                 law_metadata = LawMetaData(request.BADA) # 请求基本信息
                 request_data = request.DATA # 请求数据
-                with self.metrics_collector.start_request_timer(method_name=method_name):
-                    with trace_context_manager(trace_id=law_metadata.trace_id, context_id=context_id):
-                        _LOGGER.info(f"[{context_id}]-[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
+                with trace_context_manager(trace_id=law_metadata.trace_id, context_id=context_id):
+                    _LOGGER.info(f"[{context_id}]-[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
 
 
-                        # 请求校验
-                        if not self._check_auth(LawAuthInfo(law_metadata.auth)):
-                            self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.UNAUTHENTICATED.value)
-                            return _create_response(base_data=law_metadata.basedata,
-                                                    code=GRpcCode.UNAUTHENTICATED.value,
-                                                    context_id=context_id,
-                                                    data=orjson.dumps({"error": f"{method_name} 鉴权失败"})
-                                                    )
+                    # 请求校验
+                    if not self._check_auth(LawAuthInfo(law_metadata.auth)):
+                        self.metrics_collector.request_count.labels(method_name=method_name,
+                                                                    server_name=self.law_server_config.name,
+                                                                    endpoint=f"{THREAD_ID}",
+                                                                    status=GRpcCode.UNAUTHENTICATED.value
+                                                                    ).inc()
+                        return _create_response(base_data=law_metadata.basedata,
+                                                code=GRpcCode.UNAUTHENTICATED.value,
+                                                context_id=context_id,
+                                                data=orjson.dumps({"error": f"{method_name} 鉴权失败"})
+                                                )
 
-                        # 流控校验
-                        if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
-                            self.metrics_collector.record_request(method_name=method_name, grpc_status_code=GRpcCode.RESOURCE_EXHAUSTED.value)
-                            return _create_response(base_data=law_metadata.basedata,
-                                                    code=GRpcCode.RESOURCE_EXHAUSTED.value,
-                                                    context_id=context_id,
-                                                    data=orjson.dumps({"error": f"{method_name} 请求限量"})
-                                                    )
+                    # 流控校验
+                    if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
+                        self.metrics_collector.request_count.labels(method_name=method_name,
+                                                                    server_name=GRpcCode.RESOURCE_EXHAUSTED.value,
+                                                                    endpoint=f"{THREAD_ID}",
+                                                                    status=GRpcCode.UNAUTHENTICATED.value
+                                                                    ).inc()
+                        return _create_response(base_data=law_metadata.basedata,
+                                                code=GRpcCode.RESOURCE_EXHAUSTED.value,
+                                                context_id=context_id,
+                                                data=orjson.dumps({"error": f"{method_name} 请求限量"})
+                                                )
 
-                        # 2. 异步任务发布 (消息队列模式)
-                        if async_type:
-                            try:
-                                request_data["callback_url"] = law_metadata.callback_url
-                                task_id = async_rpc_callable.pushlish_task(method_name, request_data)
-                                return _create_response(base_data=law_metadata.basedata,
-                                                        code=GRpcCode.OK.value,
-                                                        context_id=context_id,
-                                                        data=orjson.dumps({"task_id": task_id})
-                                                        )
-                            except Exception as e:
-                                _LOGGER.error(f"[{context_id}]-[{method_name}] Async task publish failed: {e}")
-
-                        cache_key = hashlib.sha256(request_data)
-                        # 3. 缓存检查
-                        if law_metadata.is_cache:
-                            cached = self._get_cache(method_name, cache_key)
-                            if cached: return _create_response(law_metadata.basedata, cached)
-
-                        # 4. 执行业务逻辑 (区分同步异步)
+                    # 2. 异步任务发布 (消息队列模式)
+                    if async_type:
                         try:
-                            if is_async_func:
-                                # 如果是异步函数，需要在当前/全局事件循环中运行
-                                # 注意：在同步 wrapper 中调用异步 func 需要 run_until_complete 或类似机制
-                                try:
-                                    loop = asyncio.get_event_loop()
-                                except RuntimeError:
-                                    loop = asyncio.new_event_loop()
-                                    asyncio.set_event_loop(loop)
-
-                                if loop.is_running():
-                                    # 如果循环正在运行（例如已经在 async 环境下），则需要特殊处理
-                                    # 这里假设 dubbo 框架调用 wrapper 是同步的
-                                    future = asyncio.run_coroutine_threadsafe(func(request_data), loop)
-                                    response = future.result()
-                                else:
-                                    response = loop.run_until_complete(func(request_data))
-                            else:
-                                response = func(request_data)
-
-                            if law_metadata.is_cache:
-                                self._set_cache(method_name, cache_key, response)
-
-                            return _create_response(
-                                base_data=law_metadata.basedata,
-                                code=GRpcCode.OK.value,
-                                context_id=context_id,
-                                data=response
-                            )
-
+                            request_data["callback_url"] = law_metadata.callback_url
+                            task_id = async_rpc_callable.pushlish_task(method_name, request_data)
+                            return _create_response(base_data=law_metadata.basedata,
+                                                    code=GRpcCode.OK.value,
+                                                    context_id=context_id,
+                                                    data=orjson.dumps({"task_id": task_id})
+                                                    )
                         except Exception as e:
-                            error_msg = f"[{context_id}]-[{method_name}] Error: {e}"
-                            _LOGGER.error(f"{error_msg}", exc_info=True)
-                            return _create_response(
-                                base_data=law_metadata.basedata,
-                                code=GRpcCode.UNAVAILABLE.value,
-                                context_id=context_id,
-                                data=orjson.dumps({"error": error_msg})
-                            )
+                            _LOGGER.error(f"[{context_id}]-[{method_name}] Async task publish failed: {e}")
 
-                        finally:
-                            cost = (time.perf_counter() - start_time) * 1000
-                            _LOGGER.info(f"[{context_id}]-[{method_name}] End, cost: {cost:.4f}ms")
+                    cache_key = hashlib.sha256(request_data)
+                    # 3. 缓存检查
+                    if law_metadata.is_cache:
+                        cached = self._get_cache(method_name, cache_key)
+                        if cached:
+                            self.metrics_collector.use_cache_count.labels(method_name=method_name,
+                                                                    server_name=GRpcCode.RESOURCE_EXHAUSTED.value,
+                                                                    endpoint=f"{THREAD_ID}",
+                                                                    status=GRpcCode.OK.value
+                                                                    ).inc()
+                            return _create_response(base_data=law_metadata.basedata,
+                                                    code=GRpcCode.OK.value,
+                                                    context_id=context_id,
+                                                    data=cached
+                                                    )
+
+                    # 4. 执行业务逻辑 (区分同步异步)
+                    try:
+                        code = GRpcCode.OK.value
+                        if is_async_func:
+                            # 如果是异步函数，需要在当前/全局事件循环中运行
+                            # 注意：在同步 wrapper 中调用异步 func 需要 run_until_complete 或类似机制
+                            try:
+                                loop = asyncio.get_event_loop()
+                            except RuntimeError:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+
+                            if loop.is_running():
+                                # 如果循环正在运行（例如已经在 async 环境下），则需要特殊处理
+                                # 这里假设 dubbo 框架调用 wrapper 是同步的
+                                future = asyncio.run_coroutine_threadsafe(func(request_data), loop)
+                                response = future.result()
+                            else:
+                                response = loop.run_until_complete(func(request_data))
+                        else:
+                            response = func(request_data)
+
+                        if law_metadata.is_cache:
+                            self._set_cache(method_name, cache_key, response)
+
+                        return _create_response(
+                            base_data=law_metadata.basedata,
+                            code=GRpcCode.OK.value,
+                            context_id=context_id,
+                            data=response
+                        )
+
+                    except Exception as e:
+                        error_msg = f"[{context_id}]-[{method_name}] Error: {e}"
+                        _LOGGER.error(f"{error_msg}", exc_info=True)
+                        code = GRpcCode.UNAVAILABLE.value
+                        return _create_response(
+                            base_data=law_metadata.basedata,
+                            code=GRpcCode.UNAVAILABLE.value,
+                            context_id=context_id,
+                            data=orjson.dumps({"error": error_msg})
+                        )
+
+                    finally:
+                        cost = (time.perf_counter() - start_time) * 1000
+                        _LOGGER.info(f"[{context_id}]-[{method_name}] End, cost: {cost:.4f}ms")
+                        self.metrics_collector.request_count.labels(method_name=method_name,
+                                                                    server_name=self.law_server_config.name,
+                                                                    endpoint=f"{THREAD_ID}",
+                                                                    status=code
+                                                                    ).inc()
+                        self.metrics_collector.request_duration.labels(method_name=method_name,
+                                                                    server_name=self.law_server_config.name,
+                                                                    endpoint=f"{THREAD_ID}",
+                                                                    ).observe(cost)
 
             # 注册逻辑
             self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
-            self._limit_map[method_name] = LocalLimit(
-                limit_config=method_config.rate_limit(method_name=method_name).limits_keys_operation)
+            self._limit_map[method_name] = LocalLimit(limit_config=method_config.rate_limit(
+                method_name=method_name).limits_keys_operation)
             self._cache_map[method_name] = CacheClient(method_config.cache(method_name=method_name))
 
             # 异步执行器注册，这里需要确保 async_rpc_callable 能处理协程
@@ -332,7 +358,11 @@ class LawgenesisService:
         except Exception as e:
             _LOGGER.error(f"Failed to register service: {e}")
         # metrics 启动
-        start_http_server(common_constants.METRICS_PORT)
+        try:
+            start_http_server(common_constants.METRICS_PORT)
+        except Exception as e:
+            _LOGGER.error(f"Failed to metrics start HTTP server: {e}")
+            start_http_server(random.randint(10000, 10100))
         try:
             while self.run:
                 await asyncio.sleep(1)
@@ -348,7 +378,7 @@ class LawgenesisService:
         self.run = False
         await self._notify_factory.async_send_table(title="🔴服务开始停止", subtitle=self.law_server_config.name,
                                                     elements=[self._get_server_metadata()])
-        await asyncio.sleep(300)
+        await asyncio.sleep(10)
         await self._notify_factory.async_send_table(title="🔴服务彻底停止", subtitle=self.law_server_config.name,
                                                     elements=[self._get_server_metadata()])
 

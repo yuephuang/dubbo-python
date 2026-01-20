@@ -35,7 +35,7 @@ message LawgenesisRequest {
 
 message LawgenesisReply {
   BaseData BADA = 1;
-  int32 code = 2; 响应码
-  context_id = 3; 请求id
+  int32 code = 2;  // 响应码
+  string context_id = 3;  // 请求id
   bytes Response = 4; // 响应数据
 }
