@@ -127,3 +127,6 @@ NOTIFY_URL = os.environ.get("NOTIFY_URL", "")
 
 # RPC
 ASYNC_RPC_ENABLED = os.environ.get("ASYNC_RPC_ENABLED", "false") == "true"
+
+# metrics
+METRICS_PORT = int(os.environ.get("METRICS_PORT", 8000))

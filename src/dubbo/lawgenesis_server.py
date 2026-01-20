@@ -44,11 +44,11 @@ from dubbo.lawgenesis_proto.metadata import LawMetaData, LawAuthInfo
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID
-from dubbo.monitor.prometheus import EnhancedMetricsCollector
 from dubbo.notify import NoticeFactory, ServerMetaData
 from dubbo.protocol.triple.constants import GRpcCode
 from dubbo.proxy.handlers import RpcServiceHandler, RpcMethodHandler
 from dubbo.url import create_url
+from dubbo.monitor.prometheus import MetricsCollector
 
 # --- 全局常量和配置 ---
 _LOGGER = loggerFactory.get_logger()
@@ -97,8 +97,7 @@ class LawgenesisService:
         self._server_metadata: ServerMetaData = self._get_server_metadata()
         self._start_config_subscription()
         self._init_notification_service()
-        self.metrics_collector = EnhancedMetricsCollector(law_server_config.name,
-                                                          service_version=law_server_config.version)
+        self.metrics_collector = MetricsCollector(self.law_server_config.name)
         _LOGGER.info(f"LawgenesisService initialized for service: {self.law_server_config.name}")
 
     @property
@@ -160,7 +159,7 @@ class LawgenesisService:
                                          code = code,
                                          context_id = context_id,
                                          Response=data)
-        
+
         def decorator(func: Callable):
             # 判断原函数是否为异步函数
             is_async_func = asyncio.iscoroutinefunction(func)
@@ -333,7 +332,7 @@ class LawgenesisService:
         except Exception as e:
             _LOGGER.error(f"Failed to register service: {e}")
         # metrics 启动
-        start_http_server(8000)
+        start_http_server(common_constants.METRICS_PORT)
         try:
             while self.run:
                 await asyncio.sleep(1)

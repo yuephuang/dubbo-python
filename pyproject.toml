@@ -20,7 +20,7 @@ build-backend = "hatchling.build"
 
 [project]
 name="lawgenesis-dubbo"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 authors = [
     {name = "Apache Dubbo Community", email = "dev@dubbo.apache.org"}
 ]
