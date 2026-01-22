@@ -1,4 +1,4 @@
-from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
 from dubbo.proxy.handlers import RpcMethodHandler
 
 
@@ -6,8 +6,8 @@ def rpc_server(method_name, func, request_deserializer=None, response_deserializ
     return RpcMethodHandler.unary(
         method=func,  # 实际处理请求的方法
         method_name=method_name,  # 方法名称
-        request_deserializer=request_deserializer or lawgenesis_pb2.LawgenesisRequest.FromString,
-        response_serializer=response_deserializer or lawgenesis_pb2.LawgenesisReply.SerializeToString,
+        request_deserializer=request_deserializer.FromString or lawgenesis_pb2.LawgenesisRequest.FromString,
+        response_serializer=response_deserializer.SerializeToString or lawgenesis_pb2.LawgenesisReply.SerializeToString,
     )
 
 

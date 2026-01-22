@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package org.apache.dubbo.sample.tri;
+package lawgenesis;
 
 service Lawgenesis {
   rpc LawgenesisSdk(LawgenesisRequest) returns (LawgenesisReply);

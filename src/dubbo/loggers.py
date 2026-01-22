@@ -15,9 +15,12 @@
 # limitations under the License.
 import contextvars
 import enum
+import os.path
 import re
+import sys
 import threading
 import uuid
+from pathlib import Path
 
 from loguru import logger
 
@@ -36,18 +39,18 @@ def custom_formatter(record):
     """
     # 获取当前的 trace_id 和 content_id
     trace_id = TRACE_ID.get()
-    content_id = CONTEXT_ID.get()
+    context_id = CONTEXT_ID.get()
 
     # 设置到 extra 中
     record["extra"]["trace_id"] = trace_id
-    record["extra"]["content_id"] = content_id
+    record["extra"]["context"] = context_id
 
     # 构建前缀
     prefix_parts = []
     if trace_id:
         prefix_parts.append(f"[trace:{trace_id}]")
-    if content_id:
-        prefix_parts.append(f"[content:{content_id}]")
+    if context_id:
+        prefix_parts.append(f"[context:{context_id}]")
 
     # 处理前缀
     if prefix_parts:
@@ -94,9 +97,8 @@ class _LoggerFactory:
         Refresh the logger configuration.
         """
         with cls._logger_lock:
-            # Remove all handlers if already configured
-            if cls._logger_id is not None:
-                logger.remove(cls._logger_id)
+            # 移除所有现有的处理器，而不只是特定的一个
+            logger.remove()  # 不加参数会移除所有处理器
 
             config = cls._config
 
@@ -123,7 +125,8 @@ class _LoggerFactory:
 
         # Add handler with custom format function
         cls._logger_id = logger.add(
-            sink=lambda msg: print(msg, end=""),
+            sink=sys.stderr,
+            enqueue=True,  # 线程安全
             format=custom_formatter,
             level=config.level,
         )
@@ -139,10 +142,15 @@ class _LoggerFactory:
 
         # Add handler with custom format function
         logger.add(
-            sink=config.file_config.file_name,
+            sink=os.path.join(config.file_config.file_dir, config.file_config.file_name),
             format=custom_formatter,
-            level=config.level,
-            encoding="utf-8"
+            level=config.level.upper(),
+            encoding="utf-8",
+            enqueue=True,  # 线程安全
+            backtrace=True,  # 记录回溯
+            diagnose=True,  # 诊断信息
+            rotation=config.file_config.max_bytes,
+            retention=config.file_config.interval
         )
 
     @classmethod

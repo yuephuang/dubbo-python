@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import lawgenesis_pb2 as lawgenesis__pb2
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2 as dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in lawgenesis_pb2_grpc.py depends on'
+        + ' but the generated code in dubbo/lawgenesis_proto/proto/lawgenesis_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -35,9 +35,9 @@ class LawgenesisStub(object):
             channel: A grpc.Channel.
         """
         self.LawgenesisSdk = channel.unary_unary(
-                '/org.apache.dubbo.sample.tri.Lawgenesis/LawgenesisSdk',
-                request_serializer=lawgenesis__pb2.LawgenesisRequest.SerializeToString,
-                response_deserializer=lawgenesis__pb2.LawgenesisReply.FromString,
+                '/lawgenesis.Lawgenesis/LawgenesisSdk',
+                request_serializer=dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2.LawgenesisRequest.SerializeToString,
+                response_deserializer=dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2.LawgenesisReply.FromString,
                 _registered_method=True)
 
 
@@ -55,14 +55,14 @@ def add_LawgenesisServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'LawgenesisSdk': grpc.unary_unary_rpc_method_handler(
                     servicer.LawgenesisSdk,
-                    request_deserializer=lawgenesis__pb2.LawgenesisRequest.FromString,
-                    response_serializer=lawgenesis__pb2.LawgenesisReply.SerializeToString,
+                    request_deserializer=dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2.LawgenesisRequest.FromString,
+                    response_serializer=dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2.LawgenesisReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'org.apache.dubbo.sample.tri.Lawgenesis', rpc_method_handlers)
+            'lawgenesis.Lawgenesis', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('org.apache.dubbo.sample.tri.Lawgenesis', rpc_method_handlers)
+    server.add_registered_method_handlers('lawgenesis.Lawgenesis', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -83,9 +83,9 @@ class Lawgenesis(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/org.apache.dubbo.sample.tri.Lawgenesis/LawgenesisSdk',
-            lawgenesis__pb2.LawgenesisRequest.SerializeToString,
-            lawgenesis__pb2.LawgenesisReply.FromString,
+            '/lawgenesis.Lawgenesis/LawgenesisSdk',
+            dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2.LawgenesisRequest.SerializeToString,
+            dubbo_dot_lawgenesis__proto_dot_proto_dot_lawgenesis__pb2.LawgenesisReply.FromString,
             options,
             channel_credentials,
             insecure,

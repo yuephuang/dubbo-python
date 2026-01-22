@@ -196,7 +196,9 @@ class DefaultMethodRunner(MethodRunner):
 
     def handle_exception(self, e: Exception) -> None:
         if self._read_write_stream.can_write_more():
-            _LOGGER.exception("Invoke method failed: %s", e)
+            import traceback
+            traceback.print_exc()
+            _LOGGER.exception(f"Invoke method failed: {e}")
             status = TriRpcStatus(
                 GRpcCode.INTERNAL,
                 description=f"Invoke method failed: {str(e)}",

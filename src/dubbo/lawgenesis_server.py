@@ -36,7 +36,7 @@ from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig,
 from dubbo.configs import ServiceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.metadata import LawAuthInfo, LawMetaData
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
@@ -52,8 +52,8 @@ _LOGGER = loggerFactory.get_logger()
 
 try:
     async_rpc_callable = AsyncRpcCallable() if common_constants.ASYNC_RPC_ENABLED else None
-except Exception as e:
-    _LOGGER.error(f"初始化 AsyncRpcCallable 失败: {e}")
+except Exception as exc:
+    _LOGGER.error(f"初始化 AsyncRpcCallable 失败: {exc}")
     async_rpc_callable = None
 
 
@@ -144,7 +144,7 @@ class LawgenesisService:
         方法注册装饰器工厂，支持同步和异步业务函数。
         """
         if method_name == "healthy":
-            raise ValueError(f"{method_name} is a reserved method name")
+            raise ValueError(f"method: {method_name}  is a reserved method name")
         method_config = method_config or self.law_method_config
         request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest
         response_deserializer = response_deserializer or lawgenesis_pb2.LawgenesisReply
@@ -175,7 +175,7 @@ class LawgenesisService:
                 law_metadata = LawMetaData(request.BADA) # 请求基本信息
                 request_data = request.DATA # 请求数据
                 with trace_context_manager(trace_id=law_metadata.trace_id, context_id=context_id):
-                    _LOGGER.info(f"[{context_id}]-[{method_name}] Request start, trace_id: {law_metadata.trace_id}")
+                    _LOGGER.info(f"[method: {method_name} ] Request start")
 
 
                     # 请求校验
@@ -188,7 +188,7 @@ class LawgenesisService:
                         return _create_response(base_data=law_metadata.basedata,
                                                 code=GRpcCode.UNAUTHENTICATED.value,
                                                 context_id=context_id,
-                                                data=orjson.dumps({"error": f"{method_name} 鉴权失败"})
+                                                data=orjson.dumps({"error": f"method: {method_name}  鉴权失败"})
                                                 )
 
                     # 流控校验
@@ -201,7 +201,7 @@ class LawgenesisService:
                         return _create_response(base_data=law_metadata.basedata,
                                                 code=GRpcCode.RESOURCE_EXHAUSTED.value,
                                                 context_id=context_id,
-                                                data=orjson.dumps({"error": f"{method_name} 请求限量"})
+                                                data=orjson.dumps({"error": f"method: {method_name}  请求限量"})
                                                 )
 
                     # 2. 异步任务发布 (消息队列模式)
@@ -215,9 +215,12 @@ class LawgenesisService:
                                                     data=orjson.dumps({"task_id": task_id})
                                                     )
                         except Exception as e:
-                            _LOGGER.error(f"[{context_id}]-[{method_name}] Async task publish failed: {e}")
-
-                    cache_key = hashlib.sha256(request_data)
+                            _LOGGER.error(f"[method: {method_name} ] Async task publish failed: {e}")
+                    try:
+                        cache_key = hashlib.sha256(request_data.SerializeToString()) if not isinstance(request_data, bytes) else hashlib.sha256(request_data)
+                    except Exception as e:
+                        _LOGGER.warning(f"[method: {method_name} ] Async task publish failed: {e}")
+                        law_metadata.is_cache = False
                     # 3. 缓存检查
                     if law_metadata.is_cache:
                         cached = self._get_cache(method_name, cache_key)
@@ -266,7 +269,7 @@ class LawgenesisService:
                         )
 
                     except Exception as e:
-                        error_msg = f"[{context_id}]-[{method_name}] Error: {e}"
+                        error_msg = f"[method: {method_name} ] Error: {e}"
                         _LOGGER.error(f"{error_msg}", exc_info=True)
                         code = GRpcCode.UNAVAILABLE.value
                         return _create_response(
@@ -278,7 +281,7 @@ class LawgenesisService:
 
                     finally:
                         cost = (time.perf_counter() - start_time) * 1000
-                        _LOGGER.info(f"[{context_id}]-[{method_name}] End, cost: {cost:.4f}ms")
+                        _LOGGER.info(f"[method: {method_name} ] End, cost: {cost:.4f}ms")
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=self.law_server_config.name,
                                                                     endpoint=f"{THREAD_ID}",
@@ -290,7 +293,9 @@ class LawgenesisService:
                                                                     ).observe(cost)
 
             # 注册逻辑
-            self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper))
+            self.method_handlers.append(rpc_server(method_name=method_name, func=wrapper,
+                                                   request_deserializer=request_deserializer,
+                                                   response_deserializer=response_deserializer))
             self._limit_map[method_name] = LocalLimit(limit_config=method_config.rate_limit(
                 method_name=method_name).limits_keys_operation)
             self._cache_map[method_name] = CacheClient(method_config.cache(method_name=method_name))
@@ -299,15 +304,15 @@ class LawgenesisService:
             if async_rpc_callable:
                 async_rpc_callable.register_method(method_name=method_name, thread_num=1, method_instance=func)
 
-            _LOGGER.info(f"Method '{method_name}' registered (Async: {is_async_func})")
+            _LOGGER.info(f"Method 'method: {method_name} ' registered (Async: {is_async_func})")
             return wrapper
 
         return decorator
 
     def custom_method(self):
         @self.methods("health")
-        def health_check(request: Any, law_basedata: LawMetaData = None) -> dict:
-            return {"status": "ok"}
+        def health_check(request: Any) -> dict:
+            return {"status": f"{request}"}
 
 
     def _get_cache(self, method_name: str, key: str) -> Optional[bytes]:

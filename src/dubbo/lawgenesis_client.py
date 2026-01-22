@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import os
 import random
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Any
 
@@ -14,8 +15,9 @@ from dubbo.configs import ReferenceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto import LawMetaData
-from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
-from dubbo.loggers import loggerFactory
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
+from dubbo.lawgenesis_server import trace_context_manager
+from dubbo.loggers import loggerFactory, CONTEXT_ID, TRACE_ID
 from dubbo.notify import NoticeFactory, ServerMetaData
 
 DEFAULT_MAX_WORKERS = 1000
@@ -107,14 +109,15 @@ class _InvokeClient:
 
 
 
-    async def async_invoke(self, method_name: str, request_data: any) -> lawgenesis_pb2.LawgenesisReply:
+    async def async_invoke(self, method_name: str, request_data: Any, metadata: LawMetaData) -> lawgenesis_pb2.LawgenesisReply:
         loop = asyncio.get_running_loop()
         try:
             result = await loop.run_in_executor(
                 self._executor,
                 self.invoke,
                 method_name,
-                request_data
+                request_data,
+                metadata
             )
             return result
         except Exception as e:
@@ -123,8 +126,8 @@ class _InvokeClient:
                                                         elements=[self._get_server_metadata(message=e)])
             raise e
 
-    def invoke(self, method_name: str, request_data: Any):
-        metadata = LawMetaData(basedata=lawgenesis_pb2.BaseData())
+    def invoke(self, method_name: str, request_data: Any, metadata: LawMetaData):
+        metadata = metadata
         metadata.auth = self.get_authorization()
 
         law_request = self.request_deserializer(
@@ -164,7 +167,7 @@ class LawgenesisClient:
                              request_deserializer=None, response_deserializer=None
                              ) -> _InvokeClient:
         if server_name not in self.__invoke_client:
-            invoker = _InvokeClient(server_name, client_config, request_deserializer, response_deserializer)
+            invoker = _InvokeClient(server_name, client_config, None, request_deserializer, response_deserializer)
             invoker.get_service()
             invoker.subscribe()
             self.__invoke_client[server_name] = invoker
@@ -173,8 +176,16 @@ class LawgenesisClient:
     async def async_invoke(self, server_name, method_name, request_data,
                            client_config: LawClientConfig = None,
                             request_deserializer = None,
-                           response_deserializer = None
+                           response_deserializer = None,
+                           metadata = None
 
     ):
         invoke_client = self.select_invoke_client(server_name, client_config,  request_deserializer, response_deserializer)
-        return await invoke_client.async_invoke(method_name, request_data)
+        metadata = metadata or LawMetaData(basedata=lawgenesis_pb2.BaseData())
+        trace_id = TRACE_ID if TRACE_ID.get() != "N/A" else  uuid.uuid4().hex
+        context_id = CONTEXT_ID if CONTEXT_ID.get() != "N/A" else uuid.uuid4().hex
+        metadata.trace_id = trace_id
+
+        with trace_context_manager(trace_id=trace_id, context_id=context_id):
+            _LOGGER.warning(f"invoke {method_name}, {request_data}")
+            return await invoke_client.async_invoke(method_name, request_data, metadata)

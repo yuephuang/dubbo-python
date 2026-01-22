@@ -160,21 +160,18 @@ class AioClient(Client, ConnectionStateListener):
                     self._closed = False
                     self._active_close = False
                     _LOGGER.info(
-                        "Reconnected to the server. host: %s, port: %s",
-                        self._url.host,
-                        self._url.port,
+                        f"Reconnected to the server. host: {self._url.host}, port: {self._url.port}"
                     )
                     return
                 except Exception as e:
-                    exc = e
-                    _LOGGER.error("Failed to reconnect to the server. %s", exc)
+                    _LOGGER.error(f"Failed to reconnect to the server. {e}")
                     # wait for a while
                     await asyncio.sleep(1)
 
             # cannot reconnect
-            raise RemotingError(
-                f"Failed to reconnect to the server.{exc}",
-            )
+            self._event_loop.stop()
+            return
+
 
 
 class AioServer(Server):

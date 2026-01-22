@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Dict
 
-from dubbo.lawgenesis_proto.generated import lawgenesis_pb2
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
 
 
 class LawAuthInfo:
