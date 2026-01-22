@@ -21,7 +21,7 @@ This module contains common constant definitions used across the dubbo-python fr
 including framework core constants, service configuration, network settings, and more.
 All constants support environment variable overrides for flexible configuration.
 """
-
+import ast
 import os
 
 # --- 核心框架常量 --- 
@@ -130,3 +130,6 @@ ASYNC_RPC_ENABLED = os.environ.get("ASYNC_RPC_ENABLED", "false") == "true"
 
 # metrics
 METRICS_PORT = int(os.environ.get("METRICS_PORT", 8000))
+
+# client
+THREADS_PER_IP_MAP = ast.literal_eval(os.environ.get("THREADS_PER_IP_MAP", "{}"))

@@ -3,6 +3,7 @@ import datetime
 import os
 import random
 import uuid
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Any
 
@@ -20,9 +21,62 @@ from dubbo.lawgenesis_server import trace_context_manager
 from dubbo.loggers import loggerFactory, CONTEXT_ID, TRACE_ID
 from dubbo.notify import NoticeFactory, ServerMetaData
 
-DEFAULT_MAX_WORKERS = 1000
+# 配置常量
+CONNECTIONS_PER_IP = 3  # 每个 IP 建立的长连接数量（分摊 HTTP/2 Stream 压力）
 
 _LOGGER = loggerFactory.get_logger()
+
+
+class _IPConnectionPool:
+    """
+    管理单个 IP 实例的资源：
+    1. 独立的线程池 (隔离故障，控制并发)
+    2. 多个 DubboClient 连接 (避免 HTTP/2 单连接 100 Stream 限制)
+    """
+
+    def __init__(self, url_key: str, server_name: str, threads_per_ip: int = 10):
+        self.url_key = url_key
+        self.server_name = server_name
+        self.weight = 10  # 初始权重
+
+        # 1. 独立线程池
+        self.executor = ThreadPoolExecutor(
+            max_workers=threads_per_ip,
+            thread_name_prefix=f"Dubbo-{server_name}-{url_key[-10:]}"
+        )
+
+        # 2. 建立多个连接
+        self.clients: List[DubboClient] = []
+        try:
+            for _ in range(CONNECTIONS_PER_IP):
+                client = DubboClient(reference=ReferenceConfig.from_url(url=url_key))
+                self.clients.append(client)
+        except Exception as e:
+            _LOGGER.error(f"初始化连接池失败 {url_key}: {e}")
+            # 如果初始化失败，确保清理已创建的资源
+            self.shutdown()
+            raise e
+
+    def get_client(self) -> DubboClient:
+        """从池中随机获取一个连接"""
+        if not self.clients:
+            raise RuntimeError(f"Connection pool for {self.url_key} is empty")
+        return random.choice(self.clients)
+
+    def adjust_weight(self, success: bool):
+        """动态调整权重"""
+        if success:
+            self.weight = min(10, self.weight + 1)
+        else:
+            self.weight = max(1, self.weight - 1)
+
+    def shutdown(self):
+        """清理资源"""
+        self.executor.shutdown(wait=False)
+        # 这里假设 DubboClient 有 close 方法，如果有的话应该调用
+        # for client in self.clients:
+        #     client.close()
+        self.clients.clear()
 
 
 class _InvokeClient:
@@ -31,15 +85,19 @@ class _InvokeClient:
                  ):
         self.client_config = client_config or LawClientConfig()
         self.server_name = server_name
-        self._executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
-        self._urls: Dict[str, DubboClient] = {}
+        # 注意：不再使用全局 executor
+        # self._executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
+
+        # 使用 url_key -> _IPConnectionPool 的映射
+        self._pools: Dict[str, _IPConnectionPool] = {}
+
         self.nacos_client = NacosClinet()
         self._initialized = False
         self.notify_config = notify_config or NotifyConfig()
         self._notify_factory: Optional[NoticeFactory] = extensionLoader.get_extension(NoticeFactory, "feishu")()
         self._notify_factory.server_name = server_name
         self._notify_factory.url = self.notify_config.url
-        self.weight = {}
+
         self.request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest
         self.response_deserialize = response_deserialize or lawgenesis_pb2.LawgenesisReply
 
@@ -51,45 +109,41 @@ class _InvokeClient:
             ACKY="lawgenesis"
         )
 
-    @property
-    def client(self) -> str:
-        if not self._urls:
-            _LOGGER.warning(f"服务 {self.server_name} 实例列表为空，可能正在初始化...")
-            self._notify_factory.send_table(title=f"🔴服务调用失败: 服务 {self.server_name} 实例列表为空",
-                                                    subtitle=self.server_name,
-                                                    elements=[self._get_server_metadata()])
-            raise RuntimeError(f"No available instances found for server: {self.server_name}")
-        items, weights =  zip(*self.weight.items())
-        url_key = random.choices(items, weights=weights, k=1)
-        _LOGGER.info(f"调用服务{url_key}")
-        return url_key[0]
-
     def server_key(self, ip, port):
         return f"tri://{ip}:{port}/{self.server_name}"
 
     def get_service(self, instances: List[Instance] = None):
+        """
+        更新服务列表。
+        对比新旧实例列表，创建新 Pool，销毁旧 Pool。
+        """
         instances = instances or self.nacos_client.get_service(server_name=self.server_name)
-        weight = {}
-        urls = {}
+        current_keys = set()
+
+        # 1. 更新或创建 Pool
         for instance in instances:
             key = self.server_key(instance.ip, instance.port)
-            if key in self._urls:
-                urls[key] = self._urls[key]
-                weight[key] = self.weight[key]
-                continue
-            urls[key] = self.connect_client(key)
-            weight[key] = 10
+            current_keys.add(key)
 
-        self._urls = urls
-        self.weight = weight
+            if key not in self._pools:
+                _LOGGER.info(f"Add new connection pool: {key}")
+                try:
+                    self._pools[key] = _IPConnectionPool(key, self.server_name,
+                                                         common_constants.THREADS_PER_IP_MAP.get(self.server_name, 10))
+                except Exception as e:
+                    _LOGGER.error(f"Failed to create pool for {key}: {e}")
 
-    @staticmethod
-    def connect_client(url_key):
-        return DubboClient(reference=ReferenceConfig.from_url(url=url_key))
+        # 2. 清理下线的 Pool
+        existing_keys = list(self._pools.keys())
+        for key in existing_keys:
+            if key not in current_keys:
+                _LOGGER.warning(f"Remove offline connection pool: {key}")
+                pool = self._pools.pop(key)
+                pool.shutdown()
 
     def subscribe(self):
         def cb(instance_list: List[Instance]):
-            print(instance_list)
+            # print(instance_list)
             self.get_service(instance_list)
 
         self.nacos_client.subscribe_service(server_name=self.server_name, group_name=common_constants.GROUP_KEY,
@@ -107,14 +161,36 @@ class _InvokeClient:
             start_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
 
+    def select_pool(self) -> _IPConnectionPool:
+        """根据权重选择一个 IP 连接池"""
+        if not self._pools:
+            _LOGGER.warning(f"服务 {self.server_name} 实例列表为空，可能正在初始化...")
+            self._notify_factory.send_table(title=f"🔴服务调用失败: 服务 {self.server_name} 实例列表为空",
+                                            subtitle=self.server_name,
+                                            elements=[self._get_server_metadata()])
+            raise RuntimeError(f"No available instances found for server: {self.server_name}")
 
+        # 提取 Pool 和权重
+        pools = list(self._pools.values())
+        weights = [p.weight for p in pools]
 
-    async def async_invoke(self, method_name: str, request_data: Any, metadata: LawMetaData) -> lawgenesis_pb2.LawgenesisReply:
+        # 随机加权选择
+        selected_pool = random.choices(pools, weights=weights, k=1)[0]
+        return selected_pool
+
+    async def async_invoke(self, method_name: str, request_data: Any,
+                           metadata: LawMetaData) -> lawgenesis_pb2.LawgenesisReply:
         loop = asyncio.get_running_loop()
         try:
+            # 1. 在主线程选择 Pool (负载均衡)
+            pool = self.select_pool()
+
+            # 2. 将任务提交给该 Pool 专属的 Executor
+            # 这样保证了每个 IP 最多只有 THREADS_PER_IP 个并发
             result = await loop.run_in_executor(
-                self._executor,
+                pool.executor,
                 self.invoke,
+                pool,  # 将选定的 pool 传进去
                 method_name,
                 request_data,
                 metadata
@@ -123,10 +199,13 @@ class _InvokeClient:
         except Exception as e:
             await self._notify_factory.async_send_table(title="🔴服务调用失败",
                                                         subtitle=common_constants.DEFAULT_SERVER_NAME,
-                                                        elements=[self._get_server_metadata(message=e)])
+                                                        elements=[self._get_server_metadata(message=str(e))])
             raise e
 
-    def invoke(self, method_name: str, request_data: Any, metadata: LawMetaData):
+    def invoke(self, pool: _IPConnectionPool, method_name: str, request_data: Any, metadata: LawMetaData):
+        """
+        实际执行调用的方法，运行在 pool.executor 线程中
+        """
         metadata = metadata
         metadata.auth = self.get_authorization()
 
@@ -134,26 +213,39 @@ class _InvokeClient:
             DATA=request_data,
             BADA=metadata.basedata
         )
-        # 最后尝试两次
+
+        # 尝试逻辑：在同一个 IP 池内尝试
+        # 如果第一次失败，可能换一个 connection 再试一次
+        last_error = None
         for _ in range(2):
-            url_key = self.client
-            client = self._urls[url_key]
             try:
+                # 从池中获取一个 DubboClient (轮询或随机)
+                client = pool.get_client()
+
                 result = client.unary(
                     method_name=method_name,
                     request_serializer=self.request_deserializer.SerializeToString,
                     response_deserializer=self.response_deserialize.FromString,
                 )(law_request)
-                self.weight[url_key] = min(10, self.weight[url_key] + 1)
+
+                # 成功，增加权重
+                pool.adjust_weight(success=True)
                 return result
             except Exception as e:
-                _LOGGER.error(f"unary {method_name} failed {e}")
-                # url_key 降权重
-                self.weight[url_key] = max(1, self.weight[url_key] - 1)
-                if self.weight[url_key] <= 1:
-                    self._urls.pop(url_key)
-        raise Exception(f"{method_name} invoke failed, {self.weight}")
+                _LOGGER.error(f"unary {method_name} failed on {pool.url_key}: {e}")
+                last_error = e
+                # 失败，降低权重
+                pool.adjust_weight(success=False)
 
+                # 如果权重太低，考虑是否要从池子里移除（根据你的业务逻辑）
+                # 这里暂时只降权，由 get_service 负责移除完全不可用的
+
+        # 如果重试后依然失败
+        if pool.weight <= 1:
+            self._pools.pop(pool.url_key, None)
+
+        raise Exception(
+            f"{method_name} invoke failed on {pool.url_key}, final weight: {pool.weight}. Error: {last_error}")
 
 
 class LawgenesisClient:
@@ -175,15 +267,17 @@ class LawgenesisClient:
 
     async def async_invoke(self, server_name, method_name, request_data,
                            client_config: LawClientConfig = None,
-                            request_deserializer = None,
-                           response_deserializer = None,
-                           metadata = None
-
-    ):
-        invoke_client = self.select_invoke_client(server_name, client_config,  request_deserializer, response_deserializer)
+                           request_deserializer=None,
+                           response_deserializer=None,
+                           metadata=None
+                           ):
+        invoke_client = self.select_invoke_client(server_name, client_config, request_deserializer,
+                                                  response_deserializer)
         metadata = metadata or LawMetaData(basedata=lawgenesis_pb2.BaseData())
-        trace_id = TRACE_ID if TRACE_ID.get() != "N/A" else  uuid.uuid4().hex
-        context_id = CONTEXT_ID if CONTEXT_ID.get() != "N/A" else uuid.uuid4().hex
+
+        # 简单的 Trace ID 处理
+        trace_id = TRACE_ID.get() if TRACE_ID.get() != "N/A" else uuid.uuid4().hex
+        context_id = CONTEXT_ID.get() if CONTEXT_ID.get() != "N/A" else uuid.uuid4().hex
         metadata.trace_id = trace_id
 
         with trace_context_manager(trace_id=trace_id, context_id=context_id):
