@@ -2,8 +2,8 @@ import asyncio
 import datetime
 import os
 import random
+import time
 import uuid
-import traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Any
 
@@ -15,8 +15,8 @@ from dubbo.configcenter.lawgenes_config import LawClientConfig, NotifyConfig
 from dubbo.configs import ReferenceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.lawgenesis_proto import LawMetaData
-from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
+from generated.common_pb2 import LawMetaData
+from generated.common_pb2 import com
 from dubbo.lawgenesis_server import trace_context_manager
 from dubbo.loggers import loggerFactory, CONTEXT_ID, TRACE_ID
 from dubbo.notify import NoticeFactory, ServerMetaData
@@ -81,14 +81,9 @@ class _IPConnectionPool:
 
 class _InvokeClient:
     def __init__(self, server_name: str, client_config: LawClientConfig, notify_config=None,
-                 request_deserializer=None, response_deserialize=None
                  ):
         self.client_config = client_config or LawClientConfig()
         self.server_name = server_name
-        # 注意：不再使用全局 executor
-        # self._executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
-
-        # 使用 url_key -> _IPConnectionPool 的映射
         self._pools: Dict[str, _IPConnectionPool] = {}
 
         self.nacos_client = NacosClinet()
@@ -98,8 +93,9 @@ class _InvokeClient:
         self._notify_factory.server_name = server_name
         self._notify_factory.url = self.notify_config.url
 
-        self.request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest
-        self.response_deserialize = response_deserialize or lawgenesis_pb2.LawgenesisReply
+        self.request_deserializer = lawgenesis_pb2.LawgenesisRequest
+        self.response_deserialize =  lawgenesis_pb2.LawgenesisReply
+        self.retry_times = 2
 
     @staticmethod
     def get_authorization() -> lawgenesis_pb2.Auth:
@@ -143,7 +139,7 @@ class _InvokeClient:
 
     def subscribe(self):
         def cb(instance_list: List[Instance]):
-            # print(instance_list)
+            _LOGGER.info(f"subscribe instance_list: {instance_list}")
             self.get_service(instance_list)
 
         self.nacos_client.subscribe_service(server_name=self.server_name, group_name=common_constants.GROUP_KEY,
@@ -165,10 +161,12 @@ class _InvokeClient:
         """根据权重选择一个 IP 连接池"""
         if not self._pools:
             _LOGGER.warning(f"服务 {self.server_name} 实例列表为空，可能正在初始化...")
-            self._notify_factory.send_table(title=f"🔴服务调用失败: 服务 {self.server_name} 实例列表为空",
-                                            subtitle=self.server_name,
-                                            elements=[self._get_server_metadata()])
-            raise RuntimeError(f"No available instances found for server: {self.server_name}")
+            # 重新建立连接
+            self.get_service()
+            time.sleep(self.retry_times)
+            self.retry_times = min(self.retry_times * 2, 60)
+            if not  self._pools:
+                raise RuntimeError(f"No available instances found for server: {self.server_name}")
 
         # 提取 Pool 和权重
         pools = list(self._pools.values())
@@ -179,37 +177,56 @@ class _InvokeClient:
         return selected_pool
 
     async def async_invoke(self, method_name: str, request_data: Any,
-                           metadata: LawMetaData) -> lawgenesis_pb2.LawgenesisReply:
+                           metadata: LawMetaData, timeout_second = 60.0,
+                           request_serializer = None , response_deserializer =  None
+                           ) -> lawgenesis_pb2.LawgenesisReply:
         loop = asyncio.get_running_loop()
-        try:
-            # 1. 在主线程选择 Pool (负载均衡)
-            pool = self.select_pool()
 
-            # 2. 将任务提交给该 Pool 专属的 Executor
-            # 这样保证了每个 IP 最多只有 THREADS_PER_IP 个并发
-            result = await loop.run_in_executor(
-                pool.executor,
-                self.invoke,
-                pool,  # 将选定的 pool 传进去
-                method_name,
-                request_data,
-                metadata
+        try:
+            pool = self.select_pool()
+            request_serializer = request_serializer or self.request_deserializer
+            response_deserializer = response_deserializer or self.request_deserializer
+            # 使用 asyncio.wait_for 包装协程
+            result = await asyncio.wait_for(
+                loop.run_in_executor(
+                    pool.executor,
+                    self.invoke,
+                    pool,
+                    method_name,
+                    request_data,
+                    metadata,
+                    request_serializer,
+                    response_deserializer
+                ),
+                timeout=timeout_second
             )
             return result
+        except asyncio.TimeoutError:
+            # 处理超时逻辑
+            error_msg = f"服务调用超时 ({timeout_second}s)"
+            await self._notify_factory.async_send_table(
+                title="🟡服务调用超时",
+                subtitle=common_constants.DEFAULT_SERVER_NAME,
+                elements=[self._get_server_metadata(message=error_msg)]
+            )
+            raise TimeoutError(error_msg)
         except Exception as e:
-            await self._notify_factory.async_send_table(title="🔴服务调用失败",
-                                                        subtitle=common_constants.DEFAULT_SERVER_NAME,
-                                                        elements=[self._get_server_metadata(message=str(e))])
+            await self._notify_factory.async_send_table(
+                title="🔴服务调用失败",
+                subtitle=common_constants.DEFAULT_SERVER_NAME,
+                elements=[self._get_server_metadata(message=str(e))]
+            )
             raise e
 
-    def invoke(self, pool: _IPConnectionPool, method_name: str, request_data: Any, metadata: LawMetaData):
+    def invoke(self, pool: _IPConnectionPool, method_name: str, request_data: Any, metadata: LawMetaData,
+               request_serializer, response_deserializer):
         """
         实际执行调用的方法，运行在 pool.executor 线程中
         """
         metadata = metadata
         metadata.auth = self.get_authorization()
 
-        law_request = self.request_deserializer(
+        law_request = request_serializer(
             DATA=request_data,
             BADA=metadata.basedata
         )
@@ -224,8 +241,8 @@ class _InvokeClient:
 
                 result = client.unary(
                     method_name=method_name,
-                    request_serializer=self.request_deserializer.SerializeToString,
-                    response_deserializer=self.response_deserialize.FromString,
+                    request_serializer=request_serializer.SerializeToString,
+                    response_deserializer=response_deserializer.FromString,
                 )(law_request)
 
                 # 成功，增加权重
@@ -259,7 +276,7 @@ class LawgenesisClient:
                              request_deserializer=None, response_deserializer=None
                              ) -> _InvokeClient:
         if server_name not in self.__invoke_client:
-            invoker = _InvokeClient(server_name, client_config, None, request_deserializer, response_deserializer)
+            invoker = _InvokeClient(server_name, client_config, None)
             invoker.get_service()
             invoker.subscribe()
             self.__invoke_client[server_name] = invoker
@@ -269,7 +286,8 @@ class LawgenesisClient:
                            client_config: LawClientConfig = None,
                            request_deserializer=None,
                            response_deserializer=None,
-                           metadata=None
+                           metadata=None,
+                           timeout_second=60
                            ):
         invoke_client = self.select_invoke_client(server_name, client_config, request_deserializer,
                                                   response_deserializer)
@@ -281,5 +299,5 @@ class LawgenesisClient:
         metadata.trace_id = trace_id
 
         with trace_context_manager(trace_id=trace_id, context_id=context_id):
-            _LOGGER.warning(f"invoke {method_name}, {request_data}")
-            return await invoke_client.async_invoke(method_name, request_data, metadata)
+            _LOGGER.debug(f"invoke {method_name}, {request_data}")
+            return await invoke_client.async_invoke(method_name, request_data, metadata, timeout_second,request_deserializer, response_deserializer)

@@ -12,9 +12,11 @@
 # --- 标准库导入 ---
 import asyncio
 import datetime
+import functools
 import hashlib
 import os
 import random
+import signal
 import threading
 import time
 import uuid
@@ -36,8 +38,8 @@ from dubbo.configcenter.lawgenes_config import LawServerConfig, LawMethodConfig,
 from dubbo.configs import ServiceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.metadata import LawAuthInfo, LawMetaData
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID, THREAD_ID
@@ -348,7 +350,28 @@ class LawgenesisService:
         finally:
             loop.close()
 
+    def handle_exit_signal(self, sig_name):
+        _LOGGER.info(f"Received exit signal {sig_name}...")
+        # 改变 while 循环的条件
+        self.run = False
+        # 注意：这里不直接调用 async_stop，因为它是异步的
+        # 这里的逻辑是打破 while self.run 循环，让程序流向 finally 块
+
+    # 在启动方法中配置（假设在 async_start 内部或启动它的地方）
+    async def setup_signal_handlers(self):
+        loop = asyncio.get_running_loop()
+        # 监听你要捕获的信号
+        # SIGTERM: docker stop 默认信号
+        # SIGINT: Ctrl+C 信号
+        # SIGABRT: kill -6 信号
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
+            loop.add_signal_handler(
+                sig,
+                functools.partial(self.handle_exit_signal, sig.name)
+            )
+
     async def async_start(self):
+        await self.setup_signal_handlers()  # 注册信号处理器
         _LOGGER.info(f"Starting Dubbo server: {self.law_server_config.name}...")
         self.custom_method()
         self._server.start()
