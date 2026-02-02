@@ -15,8 +15,8 @@ from dubbo.configcenter.lawgenes_config import LawClientConfig, NotifyConfig
 from dubbo.configs import ReferenceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from generated.common_pb2 import LawMetaData
-from generated.common_pb2 import com
+from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
+from dubbo.lawgenesis_proto import LawMetaData
 from dubbo.lawgenesis_server import trace_context_manager
 from dubbo.loggers import loggerFactory, CONTEXT_ID, TRACE_ID
 from dubbo.notify import NoticeFactory, ServerMetaData
