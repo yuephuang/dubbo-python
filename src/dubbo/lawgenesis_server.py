@@ -283,7 +283,9 @@ class LawgenesisService:
 
                     finally:
                         cost = (time.perf_counter() - start_time) * 1000
-                        _LOGGER.info(f"[method: {method_name} ] End, cost: {cost:.4f}ms")
+                        _LOGGER.info(f"[method: {method_name} ] End, cost: {cost:.4f}ms,"
+                                     f" [request_data]: {str(request_data)[:1000]}, "
+                                     f" [response_data]: {str(response)[:1000]}")
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=self.law_server_config.name,
                                                                     endpoint=f"{THREAD_ID}",

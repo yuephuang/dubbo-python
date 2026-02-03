@@ -266,9 +266,8 @@ class _InvokeClient:
 
 
 class LawgenesisClient:
-    def __init__(self, server_url=None):
+    def __init__(self):
         self.__invoke_client: Dict[str, _InvokeClient] = {}
-        self.server_url = server_url
         self._loop = None
         self._loop_thread = None
 

@@ -1,6 +1,9 @@
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 import threading
+import time
 
+from prometheus_client import Counter, Histogram, Gauge, REGISTRY, pushadd_to_gateway
+
+from dubbo.constants import common_constants
 labelnames = ["server_name", 'method_name', 'endpoint', 'status']
 
 
@@ -27,6 +30,7 @@ class MetricsCollector:
 
         # 预创建并注册所有指标
         self._init_metrics()
+        self._start_push_thread()
         self._initialized = True
 
     def _init_metrics(self):
@@ -85,3 +89,27 @@ class MetricsCollector:
     def use_cache_count(self) -> Counter:
         """获取缓存使用计数器"""
         return self._use_cache_count
+
+    def _start_push_thread(self):
+        """启动后台线程，每隔15秒上报一次"""
+
+        def run_forever():
+            while True:
+                self.pushgateway()
+                time.sleep(15)  # 每隔15秒
+
+        # 设置为守护线程，这样主程序退出时，该线程也会自动退出
+        t = threading.Thread(target=run_forever, daemon=True, name=f"PushThread_{self.server_name}")
+        t.start()
+
+    def pushgateway(self):
+        if common_constants.PUSHGATEWAY_URL:
+            try:
+                pushadd_to_gateway(
+                    gateway=common_constants.PUSHGATEWAY_URL,
+                    job=f"{common_constants.ENV_KEY}_{common_constants.HOST_NAME}_{self.server_name}",
+                    registry=REGISTRY
+                )
+            except Exception as e:
+                # 实际应用中建议使用 logger
+                print(f"[{self.server_name}] 上报 Pushgateway 失败: {e}")
