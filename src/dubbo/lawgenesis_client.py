@@ -273,7 +273,6 @@ class LawgenesisClient:
         self._loop_thread = None
 
     def select_invoke_client(self, server_name: str, client_config: LawClientConfig = None,
-                             request_deserializer=None, response_deserializer=None
                              ) -> _InvokeClient:
         if server_name not in self.__invoke_client:
             invoker = _InvokeClient(server_name, client_config, None)
@@ -289,8 +288,7 @@ class LawgenesisClient:
                            metadata=None,
                            timeout_second=60
                            ):
-        invoke_client = self.select_invoke_client(server_name, client_config, request_deserializer,
-                                                  response_deserializer)
+        invoke_client = self.select_invoke_client(server_name, client_config)
         metadata = metadata or LawMetaData(basedata=lawgenesis_pb2.BaseData())
 
         # 简单的 Trace ID 处理

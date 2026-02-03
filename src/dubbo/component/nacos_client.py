@@ -65,22 +65,15 @@ class NacosClinet(SingletonBase):
         if all([cls.naming_client, cls.config_client]):
             return
 
-        url = create_url(common_constants.NACOS_URL)
-        server_address = f"{url.host}:{url.port if url.port else 8848}"
-        parameters = url.parameters
+        _client_config = ClientConfigBuilder() \
+            .server_address(common_constants.NACOS_ADDRESS) \
+            .namespace_id(common_constants.NACOS_NAMESPACE_ID) \
+            .username(common_constants.NACOS_USER) \
+            .password(common_constants.NACOS_PASSWORD) \
+            .cache_dir(common_constants.NACOS_CACHE) \
 
-        client_config = ClientConfigBuilder() \
-            .server_address(server_address) \
-            .namespace_id(parameters.get(registry_constants.NAMESPACE_KEY)) \
-            .username(url.username) \
-            .password(url.password) \
-            .cache_dir("/Users/huangyuepeng/code/dubbo-python/dubbo_cache/") \
-            .build()
 
-        endpoint = parameters.get("endpoint")
-        if endpoint:
-            client_config.set_endpoint(endpoint)
-
+        client_config = _client_config.build()
         grpc_config = GRPCConfig()
         client_config.grpc_config = grpc_config
 

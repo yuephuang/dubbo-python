@@ -23,6 +23,10 @@ All constants support environment variable overrides for flexible configuration.
 """
 import ast
 import os
+import uuid
+
+# 机器信息
+HOST_NAME = os.environ.get("HOST_NAME", uuid.uuid4().hex)
 
 # --- 核心框架常量 --- 
 DUBBO_VALUE = os.environ.get("DUBBO_VALUE", "dubbo")  # Dubbo框架标识
@@ -60,25 +64,32 @@ DEFAULT_SERVER_NAME = os.environ.get("DEFAULT_SERVER_NAME", "lawgenesis")  # 默
 DEFAULT_SERVER_VERSION = os.environ.get("DEFAULT_SERVER_VERSION", "1.0.0")  # 默认服务器版本
 
 # --- 环境配置 --- 
-ENV_KEY = os.environ.get("ENV_KEY", "dev")  # 环境标识（开发、测试、生产等）
+ENV_KEY = os.environ.get("ENV", "") or os.environ.get("env", "dev") # 环境标识（开发、测试、生产等）
 
 # --- Nacos注册中心配置 --- 
 SERVER_NACOS_PORT = os.environ.get("SERVER_NACOS_PORT") or DEFAULT_SERVER_PORT # 对外暴漏的端口
 SERVER_NACOS_HOST = os.environ.get("SERVER_NACOS_HOST") or LOCAL_HOST_VALUE # 对外暴露的IP
-NACOS_URL = os.environ.get("NACOS_URL")  # Nacos完整URL
+
+NACOS_ADDRESS = os.environ.get("NACOS_ADDRESS")
+NACOS_USER = os.environ.get("NACOS_USER")
+NACOS_PASSWORD = os.environ.get("NACOS_PASSWORD")
+NACOS_NAMESPACE_ID = os.environ.get("NACOS_NAMESPACE_ID")
+NACOS_CACHE = os.environ.get("NACOS_CACHE", "/Users/huangyuepeng/code/dubbo-python/dubbo_cache/")
+NACOS_PARAM = ast.literal_eval(os.environ.get("NACOS_PARAM", "{}"))
 NACOS_METAINFO = {
-    "dubbo": DUBBO_VALUE,
     "environment": ENV_KEY,
     "application": DEFAULT_SERVER_NAME,
     "version": DEFAULT_SERVER_VERSION,
     "GROUP_KEY": GROUP_KEY,
+    "HOST_NAME": HOST_NAME
 }
 
-# redis 配置
-REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")  # Redis服务器主机
-REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))  # Redis服务器端口
-REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "123456")  # Redis密码
-REDIS_DB = int(os.environ.get("REDIS_DB", 0))  # Redis数据库索引
+
+try:
+    NACOS_METAINFO.update(ast.literal_eval(os.environ.get("NACOS_METAINFO", "{}")))
+except Exception:
+    pass
+
 
 # --- Prometheus监控配置 ---
 PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "")  # Prometheus Pushgateway URL

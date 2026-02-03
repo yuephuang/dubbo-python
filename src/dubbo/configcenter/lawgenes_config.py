@@ -109,7 +109,6 @@ class LawServerConfig(ConfigReloader):
     port = common_constants.DEFAULT_SERVER_PORT
     server_group = common_constants.GROUP_KEY
     env = common_constants.ENV_KEY
-    register_center_url = common_constants.NACOS_URL
     pushgateway_url = common_constants.PUSHGATEWAY_URL
 
 
@@ -124,7 +123,6 @@ class LawClientConfig(ConfigReloader):
     env = None
     load_balance = None
     server_url = None
-    register_center_url = common_constants.NACOS_URL
 
 
 class MethodCacheConfig:
