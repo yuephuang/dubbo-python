@@ -14,13 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import contextvars
-import enum
 import os.path
-import re
 import sys
 import threading
-import uuid
-from pathlib import Path
 
 from loguru import logger
 
@@ -28,9 +24,11 @@ from dubbo.configs import LoggerConfig
 
 __all__ = ["loggerFactory"]
 
+from dubbo.constants.common_constants import HOST_NAME
+
 TRACE_ID = contextvars.ContextVar('trace_id', default='N/A')
 CONTEXT_ID = contextvars.ContextVar('context_id', default='N/A')
-THREAD_ID = uuid.uuid4().hex
+THREAD_ID = HOST_NAME
 from dubbo.monitor.loki import LokiQueueHandler
 
 def custom_formatter(record):
