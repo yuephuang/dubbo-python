@@ -15,7 +15,7 @@ from dubbo.configcenter.lawgenes_config import LawClientConfig, NotifyConfig
 from dubbo.configs import ReferenceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.generated import common_pb2
+from dubbo.generated import law_common_pb2
 from dubbo.generated.Sdk import sdk_pb2
 from dubbo.lawgenesis_proto import LawMetaData
 from dubbo.lawgenesis_server import trace_context_manager
@@ -99,8 +99,8 @@ class _InvokeClient:
         self.retry_times = 2
 
     @staticmethod
-    def get_authorization() -> common_pb2.Auth:
-        return common_pb2.Auth(
+    def get_authorization() -> law_common_pb2.Auth:
+        return law_common_pb2.Auth(
             AUTY="lawgenesis",
             ACID="lawgenesis",
             ACKY="lawgenesis"
@@ -289,7 +289,7 @@ class LawgenesisClient:
                            timeout_second=60
                            ):
         invoke_client = self.select_invoke_client(server_name, client_config)
-        metadata = metadata or LawMetaData(basedata=common_pb2.BaseData())
+        metadata = metadata or LawMetaData(basedata=law_common_pb2.BaseData())
 
         # 简单的 Trace ID 处理
         trace_id = TRACE_ID.get() if TRACE_ID.get() != "N/A" else uuid.uuid4().hex

@@ -11,10 +11,10 @@ import uuid
 from datetime import datetime
 from typing import Dict
 
-from dubbo.generated import common_pb2
+from dubbo.generated import law_common_pb2
 
 class LawAuthInfo:
-    def __init__(self, auth: common_pb2.Auth):
+    def __init__(self, auth: law_common_pb2.Auth):
         self.auth = auth
 
     @property
@@ -31,13 +31,13 @@ class LawAuthInfo:
 
 
 class LawMetaData:
-    def __init__(self, basedata: common_pb2.BaseData):
+    def __init__(self, basedata: law_common_pb2.BaseData):
         """
-        Initializes MetaData with a common_pb2.BaseData object.
+        Initializes MetaData with a law_common_pb2.BaseData object.
         Performs validation and fills in default values if missing.
         """
-        if not isinstance(basedata, common_pb2.BaseData):
-            raise TypeError("basedata must be an instance of common_pb2.BaseData")
+        if not isinstance(basedata, law_common_pb2.BaseData):
+            raise TypeError("basedata must be an instance of law_common_pb2.BaseData")
         self._baseData = basedata
         self.validate()
 
@@ -53,8 +53,8 @@ class LawMetaData:
         self._baseData.TRST = getattr(self._baseData, 'TRST', None) or int(datetime.now().timestamp() * 1000)
 
     @property
-    def basedata(self) -> common_pb2.BaseData:
-        """Returns the raw common_pb2.BaseData object."""
+    def basedata(self) -> law_common_pb2.BaseData:
+        """Returns the raw law_common_pb2.BaseData object."""
         self._baseData.VER = self.version or "1.0"
         self._baseData.CBUR = self.callback_url or ""
         self._baseData.SLA = self.sla_level or 0
@@ -152,7 +152,7 @@ class LawMetaData:
         return self._baseData.AUTH
 
     @auth.setter
-    def auth(self, value: common_pb2.Auth) -> None:
+    def auth(self, value: law_common_pb2.Auth) -> None:
         """Sets the authentication information (AUTH)."""
         self._baseData.AUTH.ACID = value.ACID
         self._baseData.AUTH.ACKY = value.ACKY

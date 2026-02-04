@@ -39,7 +39,7 @@ from dubbo.configs import ServiceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto.metadata import LawAuthInfo, LawMetaData
-from dubbo.generated import common_pb2
+from dubbo.generated import law_common_pb2
 from dubbo.generated.Sdk import sdk_pb2
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
@@ -152,7 +152,7 @@ class LawgenesisService:
         request_deserializer = request_deserializer or sdk_pb2.LawgenesisRequest
         response_deserializer = response_deserializer or sdk_pb2.LawgenesisReply
 
-        def _create_response(base_data: common_pb2.BaseData,
+        def _create_response(base_data: law_common_pb2.BaseData,
                              code: int,
                              context_id: str,
                              data: Union[bytes, Any]) -> response_deserializer:

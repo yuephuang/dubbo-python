@@ -22,10 +22,10 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
-from dubbo.generated import common_pb2 as common__pb2
+from dubbo.generated import law_law_common_pb2 as law__common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rSdk/sdk.proto\x12\x03Sdk\x1a\x0c\x63ommon.proto\"]\n\x11LawgenesisRequest\x12#\n\x04\x42\x41\x44\x41\x18\x01 \x01(\x0b\x32\x10.common.BaseDataH\x00\x88\x01\x01\x12\x11\n\x04\x44\x41TA\x18\x02 \x01(\x0cH\x01\x88\x01\x01\x42\x07\n\x05_BADAB\x07\n\x05_DATA\"\xa7\x01\n\x0fLawgenesisReply\x12#\n\x04\x42\x41\x44\x41\x18\x01 \x01(\x0b\x32\x10.common.BaseDataH\x00\x88\x01\x01\x12\x11\n\x04\x63ode\x18\x02 \x01(\x05H\x01\x88\x01\x01\x12\x17\n\ncontext_id\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x15\n\x08Response\x18\x04 \x01(\x0cH\x03\x88\x01\x01\x42\x07\n\x05_BADAB\x07\n\x05_codeB\r\n\x0b_context_idB\x0b\n\t_Response2H\n\nLawgenesis\x12:\n\nExecuteSdk\x12\x16.Sdk.LawgenesisRequest\x1a\x14.Sdk.LawgenesisReplyB!Z\x1fgithub.com/lawgenesis/proto/sdkb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rSdk/sdk.proto\x12\x03Sdk\x1a\x10law_common.proto\"]\n\x11LawgenesisRequest\x12#\n\x04\x42\x41\x44\x41\x18\x01 \x01(\x0b\x32\x10.common.BaseDataH\x00\x88\x01\x01\x12\x11\n\x04\x44\x41TA\x18\x02 \x01(\x0cH\x01\x88\x01\x01\x42\x07\n\x05_BADAB\x07\n\x05_DATA\"\xa7\x01\n\x0fLawgenesisReply\x12#\n\x04\x42\x41\x44\x41\x18\x01 \x01(\x0b\x32\x10.common.BaseDataH\x00\x88\x01\x01\x12\x11\n\x04\x63ode\x18\x02 \x01(\x05H\x01\x88\x01\x01\x12\x17\n\ncontext_id\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x15\n\x08Response\x18\x04 \x01(\x0cH\x03\x88\x01\x01\x42\x07\n\x05_BADAB\x07\n\x05_codeB\r\n\x0b_context_idB\x0b\n\t_Response2H\n\nLawgenesis\x12:\n\nExecuteSdk\x12\x16.Sdk.LawgenesisRequest\x1a\x14.Sdk.LawgenesisReplyB!Z\x1fgithub.com/lawgenesis/proto/sdkb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,10 +33,10 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'Sdk.sdk_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z\037github.com/lawgenesis/proto/sdk'
-  _globals['_LAWGENESISREQUEST']._serialized_start=36
-  _globals['_LAWGENESISREQUEST']._serialized_end=129
-  _globals['_LAWGENESISREPLY']._serialized_start=132
-  _globals['_LAWGENESISREPLY']._serialized_end=299
-  _globals['_LAWGENESIS']._serialized_start=301
-  _globals['_LAWGENESIS']._serialized_end=373
+  _globals['_LAWGENESISREQUEST']._serialized_start=40
+  _globals['_LAWGENESISREQUEST']._serialized_end=133
+  _globals['_LAWGENESISREPLY']._serialized_start=136
+  _globals['_LAWGENESISREPLY']._serialized_end=303
+  _globals['_LAWGENESIS']._serialized_start=305
+  _globals['_LAWGENESIS']._serialized_end=377
 # @@protoc_insertion_point(module_scope)
