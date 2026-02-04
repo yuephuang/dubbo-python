@@ -185,7 +185,7 @@ class LawgenesisService:
                     if not self._check_auth(LawAuthInfo(law_metadata.auth)):
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=self.law_server_config.name,
-                                                                    endpoint=f"{THREAD_ID}",
+                                                                    endpoint=common_constants.ENV_KEY,
                                                                     status=GRpcCode.UNAUTHENTICATED.value
                                                                     ).inc()
                         return _create_response(base_data=law_metadata.basedata,
@@ -198,7 +198,7 @@ class LawgenesisService:
                     if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=GRpcCode.RESOURCE_EXHAUSTED.value,
-                                                                    endpoint=f"{THREAD_ID}",
+                                                                    endpoint=common_constants.ENV_KEY,
                                                                     status=GRpcCode.UNAUTHENTICATED.value
                                                                     ).inc()
                         return _create_response(base_data=law_metadata.basedata,
@@ -230,7 +230,7 @@ class LawgenesisService:
                         if cached:
                             self.metrics_collector.use_cache_count.labels(method_name=method_name,
                                                                     server_name=GRpcCode.RESOURCE_EXHAUSTED.value,
-                                                                    endpoint=f"{THREAD_ID}",
+                                                                    endpoint=common_constants.ENV_KEY,
                                                                     status=GRpcCode.OK.value
                                                                     ).inc()
                             return _create_response(base_data=law_metadata.basedata,
@@ -289,12 +289,12 @@ class LawgenesisService:
                                      f" [response_data]: {str(response)[:1000]}")
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=self.law_server_config.name,
-                                                                    endpoint=f"{THREAD_ID}",
+                                                                    endpoint=common_constants.ENV_KEY,
                                                                     status=code
                                                                     ).inc()
                         self.metrics_collector.request_duration.labels(method_name=method_name,
                                                                     server_name=self.law_server_config.name,
-                                                                    endpoint=f"{THREAD_ID}",
+                                                                    endpoint=common_constants.ENV_KEY,
                                                                     ).observe(cost)
 
             # 注册逻辑
