@@ -64,7 +64,7 @@ DEFAULT_SERVER_NAME = os.environ.get("DEFAULT_SERVER_NAME", "lawgenesis")  # 默
 DEFAULT_SERVER_VERSION = os.environ.get("DEFAULT_SERVER_VERSION", "1.0.0")  # 默认服务器版本
 
 # --- 环境配置 --- 
-ENV_KEY = os.environ.get("ENV", "") or os.environ.get("env", "dev") # 环境标识（开发、测试、生产等）
+ENV_KEY = os.environ.get("APP_ENV", "") or os.environ.get("env", "dev") # 环境标识（开发、测试、生产等）
 
 # --- Nacos注册中心配置 --- 
 SERVER_NACOS_PORT = os.environ.get("SERVER_NACOS_PORT") or DEFAULT_SERVER_PORT # 对外暴漏的端口

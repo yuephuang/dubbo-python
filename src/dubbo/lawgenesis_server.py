@@ -39,7 +39,8 @@ from dubbo.configs import ServiceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
 from dubbo.lawgenesis_proto.metadata import LawAuthInfo, LawMetaData
-from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
+from dubbo.generated import common_pb2
+from dubbo.generated.Sdk import sdk_pb2
 from dubbo.lawgenesis_proto.rpc import rpc_server
 from dubbo.limit.local_limit import LocalLimit
 from dubbo.loggers import loggerFactory, TRACE_ID, CONTEXT_ID, THREAD_ID
@@ -148,10 +149,10 @@ class LawgenesisService:
         if method_name == "healthy":
             raise ValueError(f"method: {method_name}  is a reserved method name")
         method_config = method_config or self.law_method_config
-        request_deserializer = request_deserializer or lawgenesis_pb2.LawgenesisRequest
-        response_deserializer = response_deserializer or lawgenesis_pb2.LawgenesisReply
+        request_deserializer = request_deserializer or sdk_pb2.LawgenesisRequest
+        response_deserializer = response_deserializer or sdk_pb2.LawgenesisReply
 
-        def _create_response(base_data: lawgenesis_pb2.BaseData,
+        def _create_response(base_data: common_pb2.BaseData,
                              code: int,
                              context_id: str,
                              data: Union[bytes, Any]) -> response_deserializer:
@@ -165,7 +166,7 @@ class LawgenesisService:
             is_async_func = asyncio.iscoroutinefunction(func)
 
             @wraps(func)
-            def wrapper(request: Union[request_deserializer, lawgenesis_pb2.LawgenesisRequest]) -> Union[request_deserializer, lawgenesis_pb2.LawgenesisReply]:
+            def wrapper(request: Union[request_deserializer, sdk_pb2.LawgenesisRequest]) -> Union[request_deserializer, sdk_pb2.LawgenesisReply]:
                 """
                 内部包装器逻辑，处理通用的 RPC 生命周期。
                 注：为了兼容性，如果内部 func 是异步的，此 wrapper 在 Dubbo 框架下可能需要

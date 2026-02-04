@@ -15,7 +15,8 @@ from dubbo.configcenter.lawgenes_config import LawClientConfig, NotifyConfig
 from dubbo.configs import ReferenceConfig
 from dubbo.constants import common_constants
 from dubbo.extension import extensionLoader
-from dubbo.lawgenesis_proto.proto import lawgenesis_pb2
+from dubbo.generated import common_pb2
+from dubbo.generated.Sdk import sdk_pb2
 from dubbo.lawgenesis_proto import LawMetaData
 from dubbo.lawgenesis_server import trace_context_manager
 from dubbo.loggers import loggerFactory, CONTEXT_ID, TRACE_ID
@@ -93,13 +94,13 @@ class _InvokeClient:
         self._notify_factory.server_name = server_name
         self._notify_factory.url = self.notify_config.url
 
-        self.request_deserializer = lawgenesis_pb2.LawgenesisRequest
-        self.response_deserialize =  lawgenesis_pb2.LawgenesisReply
+        self.request_deserializer = sdk_pb2.LawgenesisRequest
+        self.response_deserialize =  sdk_pb2.LawgenesisReply
         self.retry_times = 2
 
     @staticmethod
-    def get_authorization() -> lawgenesis_pb2.Auth:
-        return lawgenesis_pb2.Auth(
+    def get_authorization() -> common_pb2.Auth:
+        return common_pb2.Auth(
             AUTY="lawgenesis",
             ACID="lawgenesis",
             ACKY="lawgenesis"
@@ -179,7 +180,7 @@ class _InvokeClient:
     async def async_invoke(self, method_name: str, request_data: Any,
                            metadata: LawMetaData, timeout_second = 60.0,
                            request_serializer = None , response_deserializer =  None
-                           ) -> lawgenesis_pb2.LawgenesisReply:
+                           ) -> sdk_pb2.LawgenesisReply:
         loop = asyncio.get_running_loop()
 
         try:
@@ -288,7 +289,7 @@ class LawgenesisClient:
                            timeout_second=60
                            ):
         invoke_client = self.select_invoke_client(server_name, client_config)
-        metadata = metadata or LawMetaData(basedata=lawgenesis_pb2.BaseData())
+        metadata = metadata or LawMetaData(basedata=common_pb2.BaseData())
 
         # 简单的 Trace ID 处理
         trace_id = TRACE_ID.get() if TRACE_ID.get() != "N/A" else uuid.uuid4().hex

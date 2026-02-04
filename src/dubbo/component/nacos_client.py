@@ -8,8 +8,8 @@ from v2.nacos import NacosNamingService, NacosConfigService, \
     SubscribeServiceParam, Instance
 
 from dubbo.classes import SingletonBase
-from dubbo.constants import common_constants, registry_constants
-from dubbo.url import create_url, URL
+from dubbo.constants import common_constants
+from dubbo.url import URL
 
 _LOGGER = logging.getLogger()
 

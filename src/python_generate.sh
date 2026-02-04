@@ -6,7 +6,7 @@
 PROJECT_ROOT="$(pwd)"
 
 # [填写建议] GIT_TOKEN: 建议在终端通过 export GIT_TOKEN=xxx 设置，不要硬编码在脚本中
-GIT_TOKEN="${GIT_TOKEN:-}"
+GIT_TOKEN="${GIT_TOKEN:-lawgenesis-gitlab-w8v1vcyMgM4BnnrsUCwP}"
 # [填写建议] GIT_BRANCH: 填写 Proto 仓库的分支名，默认 main
 GIT_BRANCH="${GIT_BRANCH:-main}"
 # [填写建议] GITLAB_URL: 仓库的 HTTPS 路径（不带 https:// 和 token 部分）
