@@ -40,7 +40,7 @@ class MetricsCollector:
 
         # 请求计数器
         self._request_counter = Counter(
-            name=f"{prefix}request_count",
+            name=f"request_count",
             documentation="request count",
             labelnames=self.label_names,
             registry=REGISTRY
@@ -48,7 +48,7 @@ class MetricsCollector:
 
         # 请求耗时直方图
         self._request_duration = Histogram(
-            name=f"{prefix}request_duration_seconds",
+            name=f"request_duration_seconds",
             documentation="request duration in seconds",
             labelnames=["server_name", 'method_name', 'endpoint'],
             registry=REGISTRY
@@ -56,7 +56,7 @@ class MetricsCollector:
 
         # 正在处理的请求数
         self._request_in_progress = Gauge(
-            name=f"{prefix}request_in_progress",
+            name=f"request_in_progress",
             documentation="request in progress",
             labelnames=["server_name", 'method_name', 'endpoint'],
             registry=REGISTRY
@@ -64,7 +64,7 @@ class MetricsCollector:
 
         # 缓存使用计数器
         self._use_cache_count = Counter(
-            name=f"{prefix}use_cache_count",
+            name=f"use_cache_count",
             documentation="use cache count",
             labelnames=self.label_names,
             registry=REGISTRY
