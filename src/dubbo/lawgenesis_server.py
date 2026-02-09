@@ -177,6 +177,7 @@ class LawgenesisService:
                 context_id = uuid.uuid4().hex # 请求id
                 law_metadata = LawMetaData(request.BADA) # 请求基本信息
                 request_data = request.DATA # 请求数据
+                status_code = GRpcCode.OK.value
                 with trace_context_manager(trace_id=law_metadata.trace_id, context_id=context_id):
                     _LOGGER.info(f"[method: {method_name} ] Request start")
 
@@ -188,6 +189,7 @@ class LawgenesisService:
                                                                     endpoint=common_constants.ENV_KEY,
                                                                     status=GRpcCode.UNAUTHENTICATED.value
                                                                     ).inc()
+                        status_code = GRpcCode.UNAUTHENTICATED.value
                         return _create_response(base_data=law_metadata.basedata,
                                                 code=GRpcCode.UNAUTHENTICATED.value,
                                                 context_id=context_id,
@@ -196,6 +198,7 @@ class LawgenesisService:
 
                     # 流控校验
                     if not self._check_rate_limit(method_name, LawAuthInfo(law_metadata.auth).auth_id):
+                        status_code = GRpcCode.UNAUTHENTICATED.value
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=GRpcCode.RESOURCE_EXHAUSTED.value,
                                                                     endpoint=common_constants.ENV_KEY,
@@ -224,21 +227,6 @@ class LawgenesisService:
                     except Exception as e:
                         _LOGGER.warning(f"[method: {method_name} ] Async task publish failed: {e}")
                         law_metadata.is_cache = False
-                    # 3. 缓存检查
-                    if law_metadata.is_cache:
-                        cached = self._get_cache(method_name, cache_key)
-                        if cached:
-                            self.metrics_collector.use_cache_count.labels(method_name=method_name,
-                                                                    server_name=GRpcCode.RESOURCE_EXHAUSTED.value,
-                                                                    endpoint=common_constants.ENV_KEY,
-                                                                    status=GRpcCode.OK.value
-                                                                    ).inc()
-                            return _create_response(base_data=law_metadata.basedata,
-                                                    code=GRpcCode.OK.value,
-                                                    context_id=context_id,
-                                                    data=cached
-                                                    )
-
                     # 4. 执行业务逻辑 (区分同步异步)
                     try:
                         code = GRpcCode.OK.value
@@ -272,6 +260,7 @@ class LawgenesisService:
                         )
 
                     except Exception as e:
+                        status_code = code=GRpcCode.UNAVAILABLE.value
                         error_msg = f"[method: {method_name} ] Error: {e}"
                         _LOGGER.error(f"{error_msg}", exc_info=True)
                         code = GRpcCode.UNAVAILABLE.value
@@ -284,9 +273,9 @@ class LawgenesisService:
 
                     finally:
                         cost = (time.perf_counter() - start_time) * 1000
-                        _LOGGER.info(f"[method: {method_name} ] End, cost: {cost:.4f}ms,"
-                                     f" [request_data]: {str(request_data)[:1000]}, "
-                                     f" [response_data]: {str(response)[:1000]}")
+                        _LOGGER.info(f"[method: {method_name} ] End, cost: {cost:.4f}ms, status_code: {status_code}"
+                                     f" [request_data]: {str(request_data)[:1000].split("\n")}, "
+                                     f" [response_data]: {str(response)[:1000].split("\n")}")
                         self.metrics_collector.request_count.labels(method_name=method_name,
                                                                     server_name=self.law_server_config.name,
                                                                     endpoint=common_constants.ENV_KEY,
